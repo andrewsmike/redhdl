@@ -52,7 +52,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
 from itertools import groupby
-from typing import Any, Generic, Literal, Optional, TypeVar
+from typing import Any, Generic, Iterator, Literal, Optional, TypeVar
 
 from frozendict import frozendict
 
@@ -136,6 +136,12 @@ class Slice:
     def values(self) -> list[int]:
         return list(range(self.start, self.stop, self.step))
 
+    def __iter__(self) -> Iterator[int]:
+        return iter(self.values())
+
+    def __len__(self) -> int:
+        return len(self.values())
+
     def __str__(self) -> str:
         return f"Slice({self.start}, {self.stop}, {self.step})"
 
@@ -161,7 +167,7 @@ class PinIdSequence:
 
     @property
     def pin_ids(self) -> list[PinId]:
-        return [(self.port_id, pin_id) for pin_id in self.slice.values()]
+        return [(self.port_id, pin_id) for pin_id in self.slice]
 
     def __len__(self):
         return len(self.pin_ids)

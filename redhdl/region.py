@@ -104,6 +104,88 @@ class Pos(NamedTuple):
     def __abs__(self) -> "Pos":
         return Pos(abs(self.x), abs(self.y), abs(self.z))
 
+    def __mul__(self, value) -> "Pos":
+        """
+        TODO: Factor vector-or-scalar operations into a common pattern.
+
+        >>> Pos(2, 3, 4) * Pos(1, 2, -1)
+        Pos(2, 6, -4)
+
+        >>> Pos(2, -3, 4) * -2
+        Pos(-4, 6, -8)
+        """
+        if isinstance(value, int):
+            right = Pos(value, value, value)
+        else:
+            right = value
+
+        return Pos(
+            self.x * right.x,
+            self.y * right.y,
+            self.z * right.z,
+        )
+
+    def __truediv__(self, value) -> "Pos":
+        """
+        >>> Pos(2, 3, 4) / Pos(2, -1, 2)
+        Pos(1, -3, 2)
+
+        >>> Pos(2, 3, 4) / -1
+        Pos(-2, -3, -4)
+
+        Note: For block stacking logic, we treat 0/0 as 0.
+        >>> Pos(2, 2, 0) / Pos(1, 1, 0)
+        Pos(2, 2, 0)
+
+        >>> Pos(2, 3, 3) / Pos(2, -1, 2)
+        Traceback (most recent call last):
+          ...
+        ValueError: Position Pos(2, 3, 3) doesn't divide cleanly by Pos(2, -1, 2).
+        """
+        if isinstance(value, int):
+            divisor = Pos(value, value, value)
+        else:
+            divisor = value
+
+        assert isinstance(divisor, Pos)
+
+        if not all((a == b == 0) or ((a % b) == 0) for a, b in zip(self, divisor)):
+            raise ValueError(f"Position {self} doesn't divide cleanly by {divisor}.")
+
+        return Pos(
+            0 if self.x == divisor.x == 0 else self.x // divisor.x,
+            0 if self.y == divisor.y == 0 else self.y // divisor.y,
+            0 if self.z == divisor.z == 0 else self.z // divisor.z,
+        )
+
+    def __mod__(self, value) -> "Pos":
+        """
+        >>> (Pos(2, 4, -6) % 2).is_zero()
+        True
+
+        >>> Pos(2, 3, 4) % Pos(2, -1, 2)
+        Pos(0, 0, 0)
+
+        >>> Pos(3, 0, 3) % Pos(2, -1, 2)
+        Pos(1, 0, 1)
+
+        Note: For block stacking logic, we treat 0 % 0 as 0.
+        >>> Pos(2, 2, 0) % Pos(1, 1, 0)
+        Pos(0, 0, 0)
+        """
+        if isinstance(value, int):
+            base = Pos(value, value, value)
+        else:
+            base = value
+
+        assert isinstance(base, Pos)
+
+        return Pos(
+            0 if (self.x == base.x == 0) else self.x % base.x,
+            0 if (self.y == base.y == 0) else self.y % base.y,
+            0 if (self.z == base.z == 0) else self.z % base.z,
+        )
+
     @classmethod
     def elem_min(cls, *points: "Pos") -> "Pos":
         xs, ys, zs = zip(*points)
@@ -124,6 +206,9 @@ class Pos(NamedTuple):
                 [z, y, -x],
             ][quarter_turns % 4]
         )
+
+    def is_zero(self) -> bool:
+        return self == Pos(0, 0, 0)
 
     def __ge__(self, other) -> bool:
         return all(left >= right for left, right in zip(self, other))
