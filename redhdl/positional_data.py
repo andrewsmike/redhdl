@@ -37,7 +37,7 @@ class PositionalData(dict[Pos, BlockData]):
         """
         return Pos.elem_max(*self.keys())
 
-    def region(self) -> Region:
+    def rect_region(self) -> Region:
         return RectangularPrism(
             min_pos=self.min_pos(),
             max_pos=self.max_pos(),

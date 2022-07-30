@@ -18,9 +18,9 @@ def placement_valid(netlist: Netlist, placement: InstancePlacement) -> bool:
     """
     instance_regions = {
         netlist.instances[instance_id]
-        .context["region"]
-        .y_rotated(xz_directions.index(direction))
+        .context.region.y_rotated(xz_directions.index(direction))
         .shifted(pos)
+        .xz_padded()  # Components need in-between space.
         for instance_id, (pos, direction) in placement.items()
     }
 

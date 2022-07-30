@@ -108,8 +108,8 @@ class Schematic:
             pos_sign_lines=self.pos_sign_lines | other.pos_sign_lines,
         )
 
-    def region(self) -> Region:
-        return self.pos_blocks.region()
+    def rect_region(self) -> Region:
+        return self.pos_blocks.rect_region()
 
     def mask(self) -> PositionMask:
         return self.pos_blocks.mask()

@@ -148,6 +148,9 @@ class Region:
     min_pos: Pos
     max_pos: Pos
 
+    def xz_padded(self, padding_blocks: int = 1) -> "Region":
+        pass
+
     def y_rotated(self, quarter_turns: int) -> "Region":
         pass
 
@@ -180,6 +183,16 @@ class RectangularPrism(Region):
         return RectangularPrism(
             min_pos=self.min_pos + offset,
             max_pos=self.max_pos + offset,
+        )
+
+    def xz_padded(self, padding_blocks: int = 1) -> Region:
+        """
+        >>> RectangularPrism(Pos(0, 0, 0), Pos(1, 2, 3)).xz_padded()
+        RectangularPrism(Pos(-1, 0, -1), Pos(2, 2, 4))
+        """
+        return RectangularPrism(
+            min_pos=self.min_pos - Pos(padding_blocks, 0, padding_blocks),
+            max_pos=self.max_pos + Pos(padding_blocks, 0, padding_blocks),
         )
 
     def y_rotated(self, quarter_turns: int) -> Region:
@@ -246,6 +259,11 @@ class CompositeRegion(Region):
     def shifted(self, offset: Pos) -> Region:
         return CompositeRegion(
             subregions=tuple(region.shifted(offset) for region in self.subregions),
+        )
+
+    def xz_padded(self, padding_blocks: int = 1) -> Region:
+        return CompositeRegion(
+            tuple(region.xz_padded(padding_blocks) for region in self.subregions)
         )
 
     def y_rotated(self, quarter_turns: int) -> Region:
