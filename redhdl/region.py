@@ -59,7 +59,9 @@ True
 
 from dataclasses import dataclass
 from functools import cache
-from typing import Any, Literal, NamedTuple, cast
+from typing import Any, Iterator, Literal, NamedTuple, cast
+
+from redhdl.slice import Slice
 
 Axis = Literal[0, 1, 2]
 
@@ -227,6 +229,86 @@ class Pos(NamedTuple):
 
     def __repr__(self: "Pos") -> str:
         return str(self)
+
+
+@dataclass(frozen=True)
+class PositionSequence:
+    """
+    Linear 3d sequence of positions.
+    Defined by start (inclusive), stop (inclusive), and either an offset
+    step Position, or a (total) target number of Positions to linearly space between
+    the start/stop.
+
+    >>> list(PositionSequence(Pos(0, 0, 0), Pos(2, 2, 0), count=3))
+    [Pos(0, 0, 0), Pos(1, 1, 0), Pos(2, 2, 0)]
+
+    >>> list(PositionSequence(Pos(-1, -1, 1), Pos(-5, -5, -3), count=3))
+    [Pos(-1, -1, 1), Pos(-3, -3, -1), Pos(-5, -5, -3)]
+
+
+    Start, step, and stop must _cleanly_ align into each other:
+    >>> PositionSequence(Pos(0, 0, 0), Pos(3, 2, 1), count=3)
+    Traceback (most recent call last):
+      ...
+    ValueError: Position Pos(3, 2, 1) doesn't divide cleanly by Pos(2, 2, 2).
+    """
+
+    start: Pos
+    stop: Pos
+    count: int
+
+    def __post_init__(self):
+        axis_step_counts = (self.stop - self.start) / self.step
+
+        x_step_count = axis_step_counts[0]
+        if not all(
+            (step_count == 0) or (step_count == x_step_count)
+            for step_count in axis_step_counts
+        ):
+            raise ValueError(
+                f"Step {self.step} doesn't cleanly divide {self.start} => {self.stop}."
+            )
+
+    @property
+    def step(self) -> Pos:
+        return (self.stop - self.start) / (self.count - 1)
+
+    def values(self) -> list[Pos]:
+        return list(self)
+
+    def __and__(self, other) -> "PositionSequence":
+        """
+        Subselect a sequence using a Slice().
+        """
+        if not isinstance(other, Slice):
+            raise TypeError(
+                f"PositionSequence.__and__ expected Slice, got {type(other)}."
+            )
+
+        assert isinstance(other, Slice)
+
+        desired_indices = list(other.values())
+
+        positions = self.values()
+
+        return PositionSequence(
+            start=positions[desired_indices[0]],
+            stop=positions[desired_indices[-1]],
+            count=len(desired_indices),
+        )
+
+    def __iter__(self) -> Iterator[Pos]:
+        for i in range(self.count):
+            yield self.start + (self.step * i)
+
+    def __len__(self) -> int:
+        return self.count
+
+    def __str__(self) -> str:
+        return f"PositionSequence({self.start}, {self.stop}, count={self.count})"
+
+    def __repr__(self) -> str:
+        return f"PositionSequence({self.start}, {self.stop}, count={self.count})"
 
 
 class Region:
