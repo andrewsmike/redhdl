@@ -31,10 +31,10 @@ Netlist(instances={'adder': Instance(...),
                                                    'placement': None,
                                                    'type': 'constant'}),
                    'constant_b': Instance(...)},
-        networks={0: Network(input_pin_id_run=PinIdRun(port_id=('constant_a', 'output'), slice=Slice(0, 4, 1)),
-                             output_pin_id_runs={PinIdRun(port_id=('adder', 'a'), slice=Slice(0, 4, 1))}),
-                  1: Network(input_pin_id_run=PinIdRun(port_id=('constant_b', 'output'), slice=Slice(0, 4, 1)),
-                             output_pin_id_runs={PinIdRun(port_id=('adder', 'b'), slice=Slice(0, 4, 1))})})
+        networks={0: Network(input_pin_id_seq=PinIdSequence(port_id=('constant_a', 'output'), slice=Slice(0, 4, 1)),
+                             output_pin_id_seqs={PinIdSequence(port_id=('adder', 'a'), slice=Slice(0, 4, 1))}),
+                  1: Network(input_pin_id_seq=PinIdSequence(port_id=('constant_b', 'output'), slice=Slice(0, 4, 1)),
+                             output_pin_id_seqs={PinIdSequence(port_id=('adder', 'b'), slice=Slice(0, 4, 1))})})
 
 >>> example_netlist.display_ascii()  # doctest: +NORMALIZE_WHITESPACE
 +------------+         +------------+
@@ -155,7 +155,7 @@ class Slice:
 
 # A sequence of pins on the same port.
 @dataclass(frozen=True)
-class PinIdRun:
+class PinIdSequence:
     port_id: PortId
     slice: Slice
 
@@ -186,43 +186,42 @@ class Network:
     """
     A network is a set of connected pins across the netlist.
     Because we frequently wire things on a byte, word, or other bit-width
-    basis, we say a network connects one output 'pin run' to other input
-    'pin runs'.
-    Exactly one must be a driver / output pin.
+    basis, we say a network connects one driving output pin sequence to
+    downstream input pin sequences.
 
     TODO: This should be frozen, but it makes the specification much more
         clunky. Consider alternatives, or whether hashability is a priority.
     """
 
-    input_pin_id_run: PinIdRun
-    output_pin_id_runs: set[PinIdRun]
+    input_pin_id_seq: PinIdSequence
+    output_pin_id_seqs: set[PinIdSequence]
 
     def __post_init__(self):
         # For debugging only.
         assert (
             len(
-                set(self.input_pin_id_run.pin_ids)
+                set(self.input_pin_id_seq.pin_ids)
                 & {
                     output_pin_id
-                    for output_pin_run in self.output_pin_id_runs
-                    for output_pin_id in output_pin_run.pin_ids
+                    for output_pin_seq in self.output_pin_id_seqs
+                    for output_pin_id in output_pin_seq.pin_ids
                 }
             )
             == 0
         ), "Attempted to create cyclic network."
 
         assert (
-            len(self.input_pin_id_run) > 0
+            len(self.input_pin_id_seq) > 0
         ), "Attempted to create network without any pins."
 
         assert all(
-            len(output_pin_run) == len(self.input_pin_id_run)
-            for output_pin_run in self.output_pin_id_runs
+            len(output_pin_seq) == len(self.input_pin_id_seq)
+            for output_pin_seq in self.output_pin_id_seqs
         ), "Attempted to create network with mismatching bit_widths."
 
     @property
     def bit_width(self) -> int:
-        return len(self.input_pin_id_run)
+        return len(self.input_pin_id_seq)
 
     @instance_cache
     def all_pin_ids(self) -> set[PinId]:
@@ -242,28 +241,28 @@ class Network:
          (('registers', 'in'), 2),
          (('registers', 'in'), 3)}
         """
-        return set(self.input_pin_id_run.pin_ids) | {
+        return set(self.input_pin_id_seq.pin_ids) | {
             output_pin_id
-            for output_pin_run in self.output_pin_id_runs
-            for output_pin_id in output_pin_run.pin_ids
+            for output_pin_seq in self.output_pin_id_seqs
+            for output_pin_id in output_pin_seq.pin_ids
         }
 
     def subnetwork(self, instance_ids: set[InstanceId]) -> Optional["Network"]:
-        if self.input_pin_id_run.port_id[0] not in instance_ids:
+        if self.input_pin_id_seq.port_id[0] not in instance_ids:
             return None
 
-        subnet_output_pin_runs = {
-            output_pin_id_run
-            for output_pin_id_run in self.output_pin_id_runs
-            if output_pin_id_run.port_id[0] in instance_ids
+        subnet_output_pin_seqs = {
+            output_pin_id_seq
+            for output_pin_id_seq in self.output_pin_id_seqs
+            if output_pin_id_seq.port_id[0] in instance_ids
         }
 
-        if len(subnet_output_pin_runs) == 0:
+        if len(subnet_output_pin_seqs) == 0:
             return None
 
         return Network(
-            input_pin_id_run=self.input_pin_id_run,
-            output_pin_id_runs=subnet_output_pin_runs,
+            input_pin_id_seq=self.input_pin_id_seq,
+            output_pin_id_seqs=subnet_output_pin_seqs,
         )
 
 
@@ -345,11 +344,11 @@ class Netlist(Generic[InstanceContext]):
         to_from_edges = sorted(
             {
                 (
-                    output_pin_id_run.port_id[0],
-                    network.input_pin_id_run.port_id[0],
+                    output_pin_id_seq.port_id[0],
+                    network.input_pin_id_seq.port_id[0],
                 )
                 for network in self.networks.values()
-                for output_pin_id_run in network.output_pin_id_runs
+                for output_pin_id_seq in network.output_pin_id_seqs
             }
         )
         draw(vertices, to_from_edges)
@@ -402,8 +401,8 @@ class Netlist(Generic[InstanceContext]):
         >>> pprint(subnetlist, width=120)
         Netlist(instances={'adder': Instance(...),
                            'constant_a': Instance(...)},
-                networks={0: Network(input_pin_id_run=PinIdRun(port_id=('constant_a', 'output'), slice=Slice(0, 4, 1)),
-                                     output_pin_id_runs={PinIdRun(port_id=('adder', 'a'), slice=Slice(0, 4, 1))})})
+                networks={0: Network(input_pin_id_seq=PinIdSequence(port_id=('constant_a', 'output'), slice=Slice(0, 4, 1)),
+                                     output_pin_id_seqs={PinIdSequence(port_id=('adder', 'a'), slice=Slice(0, 4, 1))})})
         """
         return Netlist(
             instances={
@@ -446,10 +445,10 @@ example_constant_instance: Instance[dict[str, Any]] = Instance(
 )
 
 example_network = Network(
-    input_pin_id_run=PinIdRun(("adder", "output"), Slice(4)),
-    output_pin_id_runs={
-        PinIdRun(("accumulator", "in"), Slice(4)),
-        PinIdRun(("registers", "in"), Slice(4)),
+    input_pin_id_seq=PinIdSequence(("adder", "output"), Slice(4)),
+    output_pin_id_seqs={
+        PinIdSequence(("accumulator", "in"), Slice(4)),
+        PinIdSequence(("registers", "in"), Slice(4)),
     },
 )
 
@@ -461,12 +460,12 @@ example_netlist: Netlist[dict[str, Any]] = Netlist(
     },
     networks={
         0: Network(
-            input_pin_id_run=PinIdRun(("constant_a", "output"), Slice(4)),
-            output_pin_id_runs={PinIdRun(("adder", "a"), Slice(4))},
+            input_pin_id_seq=PinIdSequence(("constant_a", "output"), Slice(4)),
+            output_pin_id_seqs={PinIdSequence(("adder", "a"), Slice(4))},
         ),
         1: Network(
-            input_pin_id_run=PinIdRun(("constant_b", "output"), Slice(4)),
-            output_pin_id_runs={PinIdRun(("adder", "b"), Slice(4))},
+            input_pin_id_seq=PinIdSequence(("constant_b", "output"), Slice(4)),
+            output_pin_id_seqs={PinIdSequence(("adder", "b"), Slice(4))},
         ),
     },
 )
