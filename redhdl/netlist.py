@@ -50,7 +50,7 @@ Netlist(instances={'adder': Instance(...),
 
 from copy import deepcopy
 from dataclasses import dataclass
-from functools import cache
+from functools import wraps
 from itertools import groupby
 from typing import Any, Generic, Literal, Optional, TypeVar
 
@@ -167,6 +167,20 @@ class PinIdRun:
         return len(self.pin_ids)
 
 
+def instance_cache(func):
+    func._cache = {}
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        key = (id(self), tuple(args), tuple(kwargs.items()))
+        if key not in func._cache:
+            func._cache[key] = func(self, *args, **kwargs)
+
+        return func._cache[key]
+
+    return wrapper
+
+
 @dataclass
 class Network:
     """
@@ -210,8 +224,24 @@ class Network:
     def bit_width(self) -> int:
         return len(self.input_pin_id_run)
 
-    @cache
+    @instance_cache
     def all_pin_ids(self) -> set[PinId]:
+        """
+        >>> from pprint import pprint
+        >>> pprint(example_network.all_pin_ids())
+        {(('accumulator', 'in'), 0),
+         (('accumulator', 'in'), 1),
+         (('accumulator', 'in'), 2),
+         (('accumulator', 'in'), 3),
+         (('adder', 'output'), 0),
+         (('adder', 'output'), 1),
+         (('adder', 'output'), 2),
+         (('adder', 'output'), 3),
+         (('registers', 'in'), 0),
+         (('registers', 'in'), 1),
+         (('registers', 'in'), 2),
+         (('registers', 'in'), 3)}
+        """
         return set(self.input_pin_id_run.pin_ids) | {
             output_pin_id
             for output_pin_run in self.output_pin_id_runs
@@ -271,9 +301,26 @@ class Netlist(Generic[InstanceContext]):
     "Dictionary so we don't have to pack a vector when manipulating netlists."
 
     @property  # type: ignore
-    @cache
+    @instance_cache
     def pin_networks(self) -> frozendict[PinId, frozenset[NetworkId]]:
-        """For _any_ I/O pin, the associated networks."""
+        """
+        For _any_ I/O pin, the associated networks.
+
+        >>> from pprint import pprint
+        >>> pprint({**example_netlist.pin_networks})
+        {(('adder', 'a'), 0): frozenset({0}),
+         ...
+         (('adder', 'a'), 3): frozenset({0}),
+         (('adder', 'b'), 0): frozenset({1}),
+         ...
+         (('adder', 'b'), 3): frozenset({1}),
+         (('constant_a', 'output'), 0): frozenset({0}),
+         ...
+         (('constant_a', 'output'), 3): frozenset({0}),
+         (('constant_b', 'output'), 0): frozenset({1}),
+         ...
+         (('constant_b', 'output'), 3): frozenset({1})}
+        """
         pin_id_network_id_pairs = sorted(
             (pin_id, network_id)
             for network_id, network in self.networks.items()
@@ -395,6 +442,14 @@ example_constant_instance: Instance[dict[str, Any]] = Instance(
         "gen_params": {"constant": 1, "bit_width": 4},
         "orientation": "north",
         "placement": None,
+    },
+)
+
+example_network = Network(
+    input_pin_id_run=PinIdRun(("adder", "output"), Slice(4)),
+    output_pin_id_runs={
+        PinIdRun(("accumulator", "in"), Slice(4)),
+        PinIdRun(("registers", "in"), Slice(4)),
     },
 )
 
