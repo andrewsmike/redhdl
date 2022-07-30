@@ -1,0 +1,53 @@
+repos:
+  - repo: local
+    hooks:
+      - id: gen_vhdl_parser
+        name: gen_vhdl_parser
+        stages: [commit]
+        language: system
+        entry: python setup.py gen_parser
+        types: [python]
+        pass_filenames: false
+        files: "^redhdl/parser/"
+
+      - id: isort
+        name: isort
+        stages: [commit]
+        language: system
+        entry: isort
+        types: [python]
+        files: "^redhdl/"
+
+      - id: black
+        name: black
+        stages: [commit]
+        language: system
+        entry: black --target-version py310
+        types: [python]
+        files: "^redhdl/"
+
+      - id: flake8
+        name: flake8
+        stages: [commit]
+        language: system
+        entry: flake8
+        types: [python]
+        exclude: 'setup.py'
+        files: "^redhdl/"
+
+      - id: mypy
+        name: mypy
+        stages: [commit]
+        language: system
+        entry: mypy
+        types: [python]
+        pass_filenames: true
+        files: "^redhdl/"
+
+      - id: pytest
+        name: pytest
+        stages: [commit]
+        language: system
+        entry: pytest
+        types: [python]
+        files: "^redhdl/"
