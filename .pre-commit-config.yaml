@@ -48,6 +48,6 @@ repos:
         name: pytest
         stages: [commit]
         language: system
-        entry: pytest
+        entry: pytest --suppress-no-test-exit-code
         types: [python]
         files: "^redhdl/"

@@ -64,10 +64,6 @@ air_block = Block("minecraft:air", frozendict())
 
 @dataclass
 class Schematic:
-    """
-    TODO: region, shift, truncate, stack, etc
-    """
-
     pos_blocks: PositionalData[Block]
     pos_sign_lines: PositionalData[list[str]]
 
@@ -87,6 +83,12 @@ class Schematic:
                 for pos, block in self.pos_blocks.items()
             ),
             pos_sign_lines=self.pos_sign_lines,
+        )
+
+    def shifted(self, offset: Pos) -> "Schematic":
+        return Schematic(
+            pos_blocks=self.pos_blocks.shifted(offset),
+            pos_sign_lines=self.pos_sign_lines.shifted(offset),
         )
 
     def __and__(self, mask: PositionMask) -> "Schematic":
