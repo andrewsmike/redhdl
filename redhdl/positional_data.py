@@ -1,5 +1,5 @@
 """
-Blocks: 3d cell (meta)data manipulations.
+Positional data: 3d cell (meta)data manipulations.
 """
 from typing import TypeVar
 

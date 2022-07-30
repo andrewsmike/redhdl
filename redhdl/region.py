@@ -32,21 +32,21 @@ False
 True
 
 
->>> composite_w_big_boi = CompositeRegion(
-...     subregions=[RectangularPrism(Pos(0, 0, 0), Pos(2, 3, 4)),
+>>> composite_w_big_boi = CompositeRegion(subregions=(
+...     RectangularPrism(Pos(0, 0, 0), Pos(2, 3, 4)),
 ...     RectangularPrism(Pos(-1, -1, -1), Pos(8, 8, 8)),
-... ])
+... ))
 
->>> composite_just_beyond = CompositeRegion(subregions=[
+>>> composite_just_beyond = CompositeRegion(subregions=(
 ...     RectangularPrism(Pos(3, 4, 5), Pos(8, 8, 8)),
 ...     RectangularPrism(Pos(-2, -2, -2), Pos(-1, -1, -1)),
-... ])
+... ))
 
 >>> pprint(composite_w_big_boi & composite_just_beyond)
-CompositeRegion(subregions=[RectangularPrism(Pos(3, 4, 5), Pos(8, 8, 8)),
-                            RectangularPrism(Pos(-1, -1, -1), Pos(-1, -1, -1))])
+CompositeRegion(subregions=(RectangularPrism(Pos(3, 4, 5), Pos(8, 8, 8)),
+                            RectangularPrism(Pos(-1, -1, -1), Pos(-1, -1, -1))))
 
->>> composite_example = CompositeRegion(subregions=[RectangularPrism(Pos(0, 0, 0), Pos(2, 3, 4))])
+>>> composite_example = CompositeRegion((RectangularPrism(Pos(0, 0, 0), Pos(2, 3, 4)),))
 >>> composite_example.intersects(just_beyond)
 False
 >>> example.intersects(composite_just_beyond)
@@ -167,7 +167,7 @@ class Region:
         return not (self & other).is_empty()
 
 
-@dataclass
+@dataclass(frozen=True)
 class RectangularPrism(Region):
     """
     Inclusive on all edges.
@@ -206,7 +206,7 @@ class RectangularPrism(Region):
     def __or__(self, other: Region) -> Any:
         if isinstance(other, RectangularPrism):
             return CompositeRegion(
-                subregions=[self, other],
+                subregions=(self, other),
             )
         else:
             return NotImplemented
@@ -224,14 +224,14 @@ class RectangularPrism(Region):
         return str(self)
 
 
-@dataclass
+@dataclass(frozen=True)
 class CompositeRegion(Region):
     """
     Note: Not necessarily minimal.
     May contain exclusively empty regions, or have completely overlapping regions.
     """
 
-    subregions: list[Region]
+    subregions: tuple[Region, ...]
 
     @property  # type: ignore
     @cache
@@ -245,22 +245,24 @@ class CompositeRegion(Region):
 
     def shifted(self, offset: Pos) -> Region:
         return CompositeRegion(
-            subregions=[region.shifted(offset) for region in self.subregions],
+            subregions=tuple(region.shifted(offset) for region in self.subregions),
         )
 
     def y_rotated(self, quarter_turns: int) -> Region:
         return CompositeRegion(
-            subregions=[region.y_rotated(quarter_turns) for region in self.subregions]
+            subregions=tuple(
+                region.y_rotated(quarter_turns) for region in self.subregions
+            )
         )
 
     def __or__(self, other: Region) -> Any:
         if isinstance(other, CompositeRegion):
             return CompositeRegion(
-                subregions=[*self.subregions, *other.subregions],
+                subregions=(*self.subregions, *other.subregions),
             )
         else:
             return CompositeRegion(
-                subregions=[*self.subregions, other],
+                subregions=(*self.subregions, other),
             )
 
     def __ror__(self, other: Region) -> Any:
@@ -282,7 +284,7 @@ class CompositeRegion(Region):
                 if not (combined_region := region & other).is_empty()
             ]
 
-        return CompositeRegion(subregions=regions)
+        return CompositeRegion(subregions=tuple(regions))
 
     def __rand__(self, other: Region) -> Any:
         return self.__and__(other)
@@ -294,8 +296,29 @@ class CompositeRegion(Region):
 def any_overlap(regions: set[Region]) -> bool:
     """
     TODO: Use AABB bounds to speed this up.
+
+    >>> any_overlap({
+    ...     CompositeRegion((
+    ...         RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
+    ...         RectangularPrism(Pos(10, 0, 0), Pos(10, 0, 0)),
+    ...         RectangularPrism(Pos(0, 0, 10), Pos(5, 5, 15)),
+    ...     )),
+    ...     RectangularPrism(Pos(0, 10, 0), Pos(5, 15, 5)),
+    ... })
+    False
+
+    >>> any_overlap({
+    ...     CompositeRegion((
+    ...         RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
+    ...         RectangularPrism(Pos(0, 0, 10), Pos(5, 5, 15)),
+    ...     )),
+    ...     RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
+    ...     RectangularPrism(Pos(5, 0, 0), Pos(10, 5, 5)),
+    ... })
+    True
     """
     ordered_regions = list(regions)
+
     return any(
         left.intersects(right)
         for left_index, left in enumerate(ordered_regions)

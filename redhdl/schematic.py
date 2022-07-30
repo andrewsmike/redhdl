@@ -9,7 +9,7 @@ from nbtlib import File as NBTFile
 from nbtlib import load
 from nbtlib.tag import ByteArray, Compound, Int, Short
 
-from redhdl.blocks import PositionalData, PositionMask
+from redhdl.positional_data import PositionalData, PositionMask
 from redhdl.region import X_AXIS, Y_AXIS, Z_AXIS, Pos, Region
 
 
