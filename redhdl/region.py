@@ -72,6 +72,7 @@ X_AXIS, Y_AXIS, Z_AXIS = axes = cast(list[Axis], [0, 1, 2])
 # Direction: Axis, is_positive
 Direction = tuple[Axis, bool]
 
+
 # Ordered by right-hand-rule rotations on the y axis.
 xz_directions = [
     (0, True),
@@ -79,6 +80,17 @@ xz_directions = [
     (0, False),
     (2, False),
 ]
+
+direction_name: dict[Direction, str] = {
+    (0, True): "east",
+    (2, True): "south",
+    (0, False): "west",
+    (2, False): "north",
+    (1, True): "up",
+    (1, False): "down",
+}
+
+direction_by_name = {name: direction for direction, name in direction_name.items()}
 
 
 def xz_direction_y_rotated(direction: Direction, quarter_turns: int = 1) -> Direction:
@@ -241,6 +253,21 @@ class Pos(NamedTuple):
 
     def __repr__(self: "Pos") -> str:
         return str(self)
+
+
+direction_unit_pos = {
+    (0, False): Pos(-1, 0, 0),
+    (1, False): Pos(0, -1, 0),
+    (2, False): Pos(0, 0, -1),
+    (0, True): Pos(1, 0, 0),
+    (1, True): Pos(0, 1, 0),
+    (2, True): Pos(0, 0, 1),
+}
+
+
+def opposite_direction(direction: Direction) -> Direction:
+    axis, is_pos = direction
+    return (axis, not is_pos)
 
 
 @dataclass(frozen=True)

@@ -1,5 +1,6 @@
 ====
 TODO: Remove concept of position mask, replace with PointsRegion.
+TODO: Replace current directions with named directions.
 
 I'm also gonna need NetlistInstance: An instance that has a subnetlist.
 From there, I may need to be able to flatten and / or combine them.
@@ -9,7 +10,7 @@ Instance context
 - Schematic
 - Position sequence
 - Region
-- 
+
 
 Soooo
 
