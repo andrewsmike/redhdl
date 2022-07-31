@@ -1,4 +1,29 @@
 ====
+TODO: Remove concept of position mask, replace with PointsRegion.
+
+I'm also gonna need NetlistInstance: An instance that has a subnetlist.
+From there, I may need to be able to flatten and / or combine them.
+
+Instance context
+- Config / generation params
+- Schematic
+- Position sequence
+- Region
+- 
+
+Soooo
+
+- Placement.py: An attempt to see what it'd look like.
+
+PositionSeq: A sequence of regularly-spaced blocks. [CHECK]
+    Represented to simplify bussing logic.
+    Associated with Ports, subselected through pin runs.
+
+PortLocation:
+    PinId + 
+
+
+====
 IO types:
 
 - Block (pulled by comparator or repeater)
@@ -15,7 +40,7 @@ MVP:
 =====
 Okay cool so
 - We have a Netlist representation
-- We have a proof of concept AABB Region concept [UNTESTED]
+- We have a proof of concept AABB Region concept
 - We have a Placement concept [UNTESTED]
 
 We need...
