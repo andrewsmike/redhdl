@@ -1,3 +1,6 @@
+from typing import cast
+
+from redhdl.instances import SchematicInstance
 from redhdl.netlist import InstanceId, Netlist
 from redhdl.region import Direction, Pos, any_overlap, xz_directions
 
@@ -12,8 +15,8 @@ def placement_valid(netlist: Netlist, placement: InstancePlacement) -> bool:
     is likely very inefficient for large placements.
     """
     instance_regions = {
-        netlist.instances[instance_id]
-        .region.y_rotated(xz_directions.index(direction))  # type: ignore
+        cast(SchematicInstance, netlist.instances[instance_id])
+        .region.y_rotated(xz_directions.index(direction))
         .shifted(pos)
         .xz_padded()  # Components need in-between space.
         for instance_id, (pos, direction) in placement.items()

@@ -81,8 +81,9 @@ class Instance:
     ports: dict[str, Port]
 
 
+PortName = str
 InstanceId = str
-PortId = tuple[InstanceId, str]
+PortId = tuple[InstanceId, PortName]
 PinId = tuple[PortId, int]
 
 
