@@ -6,7 +6,7 @@ from typing import TypeVar
 from redhdl.region import Pos, RectangularPrism, Region
 
 BlockData = TypeVar("BlockData")
-PositionMask = set[Pos]
+PositionMask = set[Pos] | Region
 
 
 class PositionalData(dict[Pos, BlockData]):
@@ -37,7 +37,7 @@ class PositionalData(dict[Pos, BlockData]):
         """
         return Pos.elem_max(*self.keys())
 
-    def rect_region(self) -> Region:
+    def rect_region(self) -> RectangularPrism:
         return RectangularPrism(
             min_pos=self.min_pos(),
             max_pos=self.max_pos(),
@@ -47,7 +47,10 @@ class PositionalData(dict[Pos, BlockData]):
         min_pos = self.min_pos() if len(self) > 0 else Pos(0, 0, 0)
         return PositionalData(self.shifted(-min_pos))
 
-    def masked(self, mask: PositionMask) -> "PositionalData[BlockData]":
+    def __and__(self, mask: PositionMask) -> "PositionalData[BlockData]":
+        return PositionalData((pos, data) for pos, data in self.items() if pos in mask)
+
+    def __sub__(self, mask: PositionMask) -> "PositionalData[BlockData]":
         return PositionalData(
             (pos, data) for pos, data in self.items() if pos not in mask
         )

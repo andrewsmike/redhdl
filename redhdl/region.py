@@ -81,6 +81,18 @@ xz_directions = [
 ]
 
 
+def xz_direction_y_rotated(direction: Direction, quarter_turns: int = 1) -> Direction:
+    return cast(
+        Direction,
+        {
+            (0, True): (2, True),
+            (2, True): (0, False),
+            (0, False): (2, False),
+            (2, False): (0, True),
+        }[direction],
+    )
+
+
 class Pos(NamedTuple):
     x: int
     y: int
@@ -276,6 +288,47 @@ class PositionSequence:
     def values(self) -> list[Pos]:
         return list(self)
 
+    def y_rotated(self, quarter_turns: int) -> "PositionSequence":
+        """
+        >>> list(PositionSequence(Pos(1, 2, 3), Pos(2, 3, 4), count=2).y_rotated(1))
+        [Pos(-3, 2, 1), Pos(-4, 3, 2)]
+        """
+        return PositionSequence(
+            start=self.start.y_rotated(quarter_turns),
+            stop=self.stop.y_rotated(quarter_turns),
+            count=self.count,
+        )
+
+    def __add__(self, other) -> "PositionSequence":
+        if not isinstance(other, Pos):
+            raise TypeError(f"Expected Pos, found {type(other)}")
+
+        return PositionSequence(
+            start=self.start + other,
+            stop=self.stop + other,
+            count=self.count,
+        )
+
+    def __sub__(self, other) -> "PositionSequence":
+        if not isinstance(other, Pos):
+            raise TypeError(f"Expected Pos, found {type(other)}")
+
+        return PositionSequence(
+            start=self.start - other,
+            stop=self.stop - other,
+            count=self.count,
+        )
+
+    def __neg__(self, other) -> "PositionSequence":
+        if not isinstance(other, Pos):
+            raise TypeError(f"Expected Pos, found {type(other)}")
+
+        return PositionSequence(
+            start=-self.start,
+            stop=-self.stop,
+            count=self.count,
+        )
+
     def __and__(self, other) -> "PositionSequence":
         """
         Subselect a sequence using a Slice().
@@ -330,6 +383,9 @@ class Region:
     def __and__(self, other: "Region") -> Any:
         return NotImplemented
 
+    def __contains__(self, point: Pos) -> bool:
+        raise NotImplementedError
+
     def is_empty(self) -> bool:
         raise NotImplementedError
 
@@ -370,6 +426,9 @@ class RectangularPrism(Region):
             min_pos=Pos.elem_min(a, b),
             max_pos=Pos.elem_max(a, b),
         )
+
+    def __contains__(self, point: Pos) -> bool:
+        return self.min_pos <= point <= self.max_pos
 
     def __and__(self, other: Region) -> Any:
         if isinstance(other, RectangularPrism):
@@ -439,6 +498,9 @@ class CompositeRegion(Region):
                 region.y_rotated(quarter_turns) for region in self.subregions
             )
         )
+
+    def __contains__(self, point: Pos) -> bool:
+        return any(point in region for region in self.subregions)
 
     def __or__(self, other: Region) -> Any:
         if isinstance(other, CompositeRegion):

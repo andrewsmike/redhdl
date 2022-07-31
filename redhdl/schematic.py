@@ -10,7 +10,7 @@ from nbtlib import load
 from nbtlib.tag import ByteArray, Compound, Int, Short
 
 from redhdl.positional_data import PositionalData, PositionMask
-from redhdl.region import X_AXIS, Y_AXIS, Z_AXIS, Pos, Region
+from redhdl.region import X_AXIS, Y_AXIS, Z_AXIS, Pos, RectangularPrism
 
 
 @dataclass(frozen=True, order=True)
@@ -91,15 +91,13 @@ class Schematic:
             pos_sign_lines=self.pos_sign_lines.shifted(offset),
         )
 
-    def __and__(self, mask: PositionMask) -> "Schematic":
-        if not isinstance(mask, set):
-            raise ValueError(
-                f"Attempted to __and__ Schematic to {type(mask)}; expected PositionMask."
-            )
+    def shift_normalized(self) -> "Schematic":
+        return self.shifted(-self.rect_region().min_pos)
 
+    def __and__(self, mask: PositionMask) -> "Schematic":
         return Schematic(
-            pos_blocks=self.pos_blocks.masked(mask),
-            pos_sign_lines=self.pos_sign_lines.masked(mask),
+            pos_blocks=self.pos_blocks & mask,
+            pos_sign_lines=self.pos_sign_lines & mask,
         )
 
     def __or__(self, other) -> "Schematic":
@@ -108,7 +106,13 @@ class Schematic:
             pos_sign_lines=self.pos_sign_lines | other.pos_sign_lines,
         )
 
-    def rect_region(self) -> Region:
+    def __sub__(self, mask: PositionMask) -> "Schematic":
+        return Schematic(
+            pos_blocks=self.pos_blocks - mask,
+            pos_sign_lines=self.pos_sign_lines - mask,
+        )
+
+    def rect_region(self) -> RectangularPrism:
         return self.pos_blocks.rect_region()
 
     def mask(self) -> PositionMask:
