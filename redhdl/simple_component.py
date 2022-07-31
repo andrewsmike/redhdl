@@ -55,8 +55,25 @@ SchematicInstance(ports={'a': RepeaterPort(port_type='input',
                                            facing=(2, True))},
                   name='diagonal not',
                   schematic=Schematic(...),
-                  region=RectangularPrism(Pos(1, 1, 1), Pos(3, 2, 3)))
+                  region=RectangularPrism(Pos(0, 0, 0), Pos(2, 1, 2)))
 
+>>> and_schem = load_schem("schematic_examples/hdl_and_h8b.schem")
+>>> pprint(simple_schematic_instance(and_schem))
+SchematicInstance(ports={'a': RepeaterPort(port_type='input',
+                                           pin_count=8,
+                                           positions=PositionSequence(Pos(0, 2, 0), Pos(14, 2, 0), count=8),
+                                           facing=(2, True)),
+                         'b': RepeaterPort(port_type='input',
+                                           pin_count=8,
+                                           positions=PositionSequence(Pos(0, 0, 0), Pos(14, 0, 0), count=8),
+                                           facing=(2, True)),
+                         'out': RepeaterPort(port_type='output',
+                                             pin_count=8,
+                                             positions=PositionSequence(Pos(0, 1, 2), Pos(14, 1, 2), count=8),
+                                             facing=(2, True))},
+                  name='and_h8b',
+                  schematic=Schematic(...),
+                  region=RectangularPrism(Pos(0, 0, 0), Pos(14, 3, 2)))
 """
 from re import match
 from typing import Dict, cast
@@ -183,5 +200,5 @@ def simple_schematic_instance(schem: Schematic) -> SchematicInstance:
         name=schem_name,
         ports=cast(dict[str, Port], ports),
         schematic=core_schem_normalized,
-        region=core_schem.rect_region(),
+        region=core_schem_normalized.rect_region(),
     )
