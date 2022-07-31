@@ -10,27 +10,27 @@ reference abstract netlists, or may be attached as part of the InstanceContext g
 
 >>> from redhdl.netlist import example_adder_instance
 >>> pprint(example_adder_instance)
-Instance(ports={'a': Port(port_type='in', pin_count=4),
-                'b': Port(port_type='in', pin_count=4),
-                'cin': Port(port_type='in', pin_count=1),
-                'cout': Port(port_type='out', pin_count=1),
-                'out': Port(port_type='out', pin_count=4)},
-         context={'gen_params': {'bit_width': 4},
-                  'orientation': 'north',
-                  'placement': None,
-                  'template_schematic': 'rsw_carry_cut_adder',
-                  'type': 'adder'})
+ExampleInstanceType(ports={'a': Port(port_type='in', pin_count=4),
+                           'b': Port(port_type='in', pin_count=4),
+                           'cin': Port(port_type='in', pin_count=1),
+                           'cout': Port(port_type='out', pin_count=1),
+                           'out': Port(port_type='out', pin_count=4)},
+                    context={'gen_params': {'bit_width': 4},
+                             'orientation': 'north',
+                             'placement': None,
+                             'template_schematic': 'rsw_carry_cut_adder',
+                             'type': 'adder'})
 
 
 >>> from redhdl.netlist import example_netlist
 >>> pprint(example_netlist, width=120)
-Netlist(instances={'adder': Instance(...),
-                   'constant_a': Instance(ports={'out': Port(port_type='out', pin_count=4)},
-                                          context={'gen_params': {'bit_width': 4, 'constant': 1},
-                                                   'orientation': 'north',
-                                                   'placement': None,
-                                                   'type': 'constant'}),
-                   'constant_b': Instance(...)},
+Netlist(instances={'adder': ExampleInstanceType(...),
+                   'constant_a': ExampleInstanceType(ports={'out': Port(port_type='out', pin_count=4)},
+                                                     context={'gen_params': {'bit_width': 4, 'constant': 1},
+                                                              'orientation': 'north',
+                                                              'placement': None,
+                                                              'type': 'constant'}),
+                   'constant_b': ExampleInstanceType(...)},
         networks={0: Network(input_pin_id_seq=PinIdSequence(port_id=('constant_a', 'output'), slice=Slice(0, 4, 1)),
                              output_pin_id_seqs={PinIdSequence(port_id=('adder', 'a'), slice=Slice(0, 4, 1))}),
                   1: Network(input_pin_id_seq=PinIdSequence(port_id=('constant_b', 'output'), slice=Slice(0, 4, 1)),
@@ -52,7 +52,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
 from itertools import groupby
-from typing import Any, Generic, Literal, Optional, TypeVar
+from typing import Any, Literal, Optional
 
 from frozendict import frozendict
 
@@ -70,21 +70,15 @@ class Port:
     pin_count: int
 
 
-# The more frozen structures, the better.
-InstanceContext = TypeVar("InstanceContext")
-"""
-Arbitrary (meta)data attached to instances.
-This makes abstractnetlists reusable for a variety of purposes.
-"""
-
-
 @dataclass
-class Instance(Generic[InstanceContext]):
-    ports: dict[str, Port]
+class Instance:
+    """
+    Instance interface.
+    It's expected that this will be subclassed to add a variety of useful metadata,
+    depending on the purpose.
+    """
 
-    context: InstanceContext
-    # Things that may be stored outside the network:
-    # configuration, region data, placement data, block data, cached properties, etc
+    ports: dict[str, Port]
 
 
 InstanceId = str
@@ -209,7 +203,7 @@ NetworkId = int
 
 
 @dataclass
-class Netlist(Generic[InstanceContext]):
+class Netlist:
     """
     Instance: A module with defined input and output ports.
         Has an additional InstanceContext object for external usage.
@@ -233,7 +227,7 @@ class Netlist(Generic[InstanceContext]):
     IDs for everything to reduce the amount of state and simplify reasoning.
     """
 
-    instances: dict[InstanceId, Instance[InstanceContext]]
+    instances: dict[InstanceId, Instance]
     "Dictionary so we don't have to pack a vector when manipulating netlists."
     networks: dict[NetworkId, Network]
     "Dictionary so we don't have to pack a vector when manipulating netlists."
@@ -338,8 +332,8 @@ class Netlist(Generic[InstanceContext]):
           +-------+
         >>> from pprint import pprint
         >>> pprint(subnetlist, width=120)
-        Netlist(instances={'adder': Instance(...),
-                           'constant_a': Instance(...)},
+        Netlist(instances={'adder': ExampleInstanceType(...),
+                           'constant_a': ExampleInstanceType(...)},
                 networks={0: Network(input_pin_id_seq=PinIdSequence(port_id=('constant_a', 'output'), slice=Slice(0, 4, 1)),
                                      output_pin_id_seqs={PinIdSequence(port_id=('adder', 'a'), slice=Slice(0, 4, 1))})})
         """
@@ -357,7 +351,12 @@ class Netlist(Generic[InstanceContext]):
         )
 
 
-example_adder_instance: Instance[dict[str, Any]] = Instance(
+@dataclass
+class ExampleInstanceType(Instance):
+    context: dict[str, Any]
+
+
+example_adder_instance: Instance = ExampleInstanceType(
     ports={
         "a": Port("in", pin_count=4),
         "b": Port("in", pin_count=4),
@@ -373,7 +372,7 @@ example_adder_instance: Instance[dict[str, Any]] = Instance(
         "placement": None,
     },
 )
-example_constant_instance: Instance[dict[str, Any]] = Instance(
+example_constant_instance: Instance = ExampleInstanceType(
     ports={"out": Port("out", pin_count=4)},
     context={
         "type": "constant",
@@ -391,7 +390,7 @@ example_network = Network(
     },
 )
 
-example_netlist: Netlist[dict[str, Any]] = Netlist(
+example_netlist: Netlist = Netlist(
     instances={
         "constant_a": deepcopy(example_constant_instance),
         "constant_b": deepcopy(example_constant_instance),
