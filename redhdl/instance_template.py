@@ -48,11 +48,11 @@ Schematic(pos_blocks={Pos(0, 0, 0): Block(block_type='minecraft:oak_wall_sign',
 SchematicInstance(ports={'a': RepeaterPort(port_type='input',
                                            pin_count=1,
                                            positions=PositionSequence(Pos(1, 0, 0), Pos(1, 0, 0), count=1),
-                                           facing=(2, True)),
+                                           facing='south'),
                          'b': RepeaterPort(port_type='output',
                                            pin_count=1,
                                            positions=PositionSequence(Pos(2, 0, 2), Pos(2, 0, 2), count=1),
-                                           facing=(2, True))},
+                                           facing='south')},
                   name='diagonal not',
                   schematic=Schematic(...),
                   region=RectangularPrism(Pos(0, 0, 0), Pos(2, 1, 2)))
@@ -62,15 +62,15 @@ SchematicInstance(ports={'a': RepeaterPort(port_type='input',
 SchematicInstance(ports={'a': RepeaterPort(port_type='input',
                                            pin_count=8,
                                            positions=PositionSequence(Pos(0, 2, 0), Pos(14, 2, 0), count=8),
-                                           facing=(2, True)),
+                                           facing='south'),
                          'b': RepeaterPort(port_type='input',
                                            pin_count=8,
                                            positions=PositionSequence(Pos(0, 0, 0), Pos(14, 0, 0), count=8),
-                                           facing=(2, True)),
+                                           facing='south'),
                          'out': RepeaterPort(port_type='output',
                                              pin_count=8,
                                              positions=PositionSequence(Pos(0, 1, 2), Pos(14, 1, 2), count=8),
-                                             facing=(2, True))},
+                                             facing='south')},
                   name='and_h8b',
                   schematic=Schematic(...),
                   region=RectangularPrism(Pos(0, 0, 0), Pos(14, 3, 2)))
@@ -80,11 +80,11 @@ SchematicInstance(ports={'a': RepeaterPort(port_type='input',
 SchematicInstance(ports={'in': RepeaterPort(port_type='input',
                                             pin_count=8,
                                             positions=PositionSequence(Pos(0, 0, 0), Pos(14, 0, 0), count=8),
-                                            facing=(2, True)),
+                                            facing='south'),
                          'out': RepeaterPort(port_type='output',
                                              pin_count=8,
                                              positions=PositionSequence(Pos(0, 0, 3), Pos(14, 0, 3), count=8),
-                                             facing=(2, True))},
+                                             facing='south')},
                   name='not_h8b',
                   schematic=Schematic(...),
                   region=RectangularPrism(Pos(0, 0, 0), Pos(14, 1, 3)))
@@ -96,10 +96,10 @@ from redhdl.instances import Port, RepeaterPort, SchematicInstance
 from redhdl.netlist import PortType
 from redhdl.positional_data import PositionalData
 from redhdl.region import (
+    Direction,
     Pos,
     PositionSequence,
     RectangularPrism,
-    direction_by_name,
     direction_unit_pos,
     opposite_direction,
 )
@@ -187,13 +187,14 @@ def schematic_instance_from_schem(schem: Schematic) -> SchematicInstance:
             port_index_position[(port_name, pin_count - 1)],
         )
 
-        sign_facing_direction = direction_by_name[
-            schem.pos_blocks[start_sign_pos].attributes["facing"]
-        ]
+        sign_facing_direction = cast(
+            Direction,
+            schem.pos_blocks[start_sign_pos].attributes["facing"],
+        )
         sign_base_block_offset = -direction_unit_pos[sign_facing_direction]
 
         if port_type[port_name] == "input":
-            facing = opposite_direction(sign_facing_direction)
+            facing = opposite_direction[sign_facing_direction]
         elif port_type[port_name] == "output":
             facing = sign_facing_direction
         else:

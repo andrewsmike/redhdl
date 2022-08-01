@@ -70,18 +70,18 @@ X_AXIS, Y_AXIS, Z_AXIS = axes = cast(list[Axis], [0, 1, 2])
 
 
 # Direction: Axis, is_positive
-Direction = tuple[Axis, bool]
+Direction = Literal["up", "down", "north", "east", "south", "west"]
 
 
 # Ordered by right-hand-rule rotations on the y axis.
 xz_directions = [
-    (0, True),
-    (2, True),
-    (0, False),
-    (2, False),
+    "north",
+    "east",
+    "south",
+    "west",
 ]
 
-direction_name: dict[Direction, str] = {
+direction_by_axis_ispos: dict[tuple[Axis, bool], Direction] = {
     (0, True): "east",
     (2, True): "south",
     (0, False): "west",
@@ -90,19 +90,34 @@ direction_name: dict[Direction, str] = {
     (1, False): "down",
 }
 
-direction_by_name = {name: direction for direction, name in direction_name.items()}
+direction_axis_ispos = {
+    direction: axis_is_pos for axis_is_pos, direction in direction_by_axis_ispos.items()
+}
+
+
+opposite_direction: dict[str, Direction] = {
+    "north": "south",
+    "south": "north",
+    "up": "down",
+    "down": "up",
+    "east": "west",
+    "west": "east",
+}
 
 
 def xz_direction_y_rotated(direction: Direction, quarter_turns: int = 1) -> Direction:
-    return cast(
-        Direction,
-        {
-            (0, True): (2, True),
-            (2, True): (0, False),
-            (0, False): (2, False),
-            (2, False): (0, True),
-        }[direction],
-    )
+    for i in range(quarter_turns):
+        direction = cast(
+            Direction,
+            {
+                "north": "west",
+                "west": "south",
+                "south": "east",
+                "east": "north",
+            }[direction],
+        )
+
+    return direction
 
 
 class Pos(NamedTuple):
@@ -227,9 +242,9 @@ class Pos(NamedTuple):
         return Pos(
             *[
                 [x, y, z],
-                [-z, y, x],
-                [-x, y, -z],
                 [z, y, -x],
+                [-x, y, -z],
+                [-z, y, x],
             ][quarter_turns % 4]
         )
 
@@ -256,18 +271,13 @@ class Pos(NamedTuple):
 
 
 direction_unit_pos = {
-    (0, False): Pos(-1, 0, 0),
-    (1, False): Pos(0, -1, 0),
-    (2, False): Pos(0, 0, -1),
-    (0, True): Pos(1, 0, 0),
-    (1, True): Pos(0, 1, 0),
-    (2, True): Pos(0, 0, 1),
+    "west": Pos(-1, 0, 0),
+    "down": Pos(0, -1, 0),
+    "north": Pos(0, 0, -1),
+    "east": Pos(1, 0, 0),
+    "up": Pos(0, 1, 0),
+    "south": Pos(0, 0, 1),
 }
-
-
-def opposite_direction(direction: Direction) -> Direction:
-    axis, is_pos = direction
-    return (axis, not is_pos)
 
 
 @dataclass(frozen=True)
@@ -318,7 +328,7 @@ class PositionSequence:
     def y_rotated(self, quarter_turns: int) -> "PositionSequence":
         """
         >>> list(PositionSequence(Pos(1, 2, 3), Pos(2, 3, 4), count=2).y_rotated(1))
-        [Pos(-3, 2, 1), Pos(-4, 3, 2)]
+        [Pos(3, 2, -1), Pos(4, 3, -2)]
         """
         return PositionSequence(
             start=self.start.y_rotated(quarter_turns),
