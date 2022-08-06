@@ -59,6 +59,7 @@ True
 
 from dataclasses import dataclass
 from functools import cache
+from pprint import pformat
 from typing import Any, Iterator, Literal, NamedTuple, cast
 
 from redhdl.slice import Slice
@@ -251,6 +252,9 @@ class Pos(NamedTuple):
     def is_zero(self) -> bool:
         return self == Pos(0, 0, 0)
 
+    def l1(self) -> int:
+        return sum(abs(self))
+
     def __ge__(self, other) -> bool:
         return all(left >= right for left, right in zip(self, other))
 
@@ -309,9 +313,9 @@ class PositionSequence:
     def __post_init__(self):
         axis_step_counts = (self.stop - self.start) / self.step
 
-        x_step_count = axis_step_counts[0]
+        max_step_count = max(abs(axis_step_counts))
         if not all(
-            (step_count == 0) or (step_count == x_step_count)
+            (step_count == 0) or (step_count == max_step_count)
             for step_count in axis_step_counts
         ):
             raise ValueError(
@@ -431,6 +435,83 @@ class Region:
 
 
 @dataclass(frozen=True)
+class PointRegion(Region):
+    points: frozenset[Pos]
+
+    def shifted(self, offset: Pos) -> Region:
+        return PointRegion(frozenset(point + offset for point in self.points))
+
+    def xz_padded(self, padding_blocks: int = 1) -> Region:
+        """
+        >>> region = PointRegion(frozenset({Pos(0, 0, 0)})).xz_padded(2)
+        >>> Pos(2, 2, 2) in region
+        True
+        >>> Pos(3, 2, 2) in region
+        False
+        """
+        return PointRegion(
+            frozenset(
+                point + Pos(dx, dy, dz)
+                for point in self.points
+                for dx in range(-padding_blocks, padding_blocks + 1)
+                for dy in range(-padding_blocks, padding_blocks + 1)
+                for dz in range(-padding_blocks, padding_blocks + 1)
+            )
+        )
+        self.min_pos - Pos(padding_blocks, 0, padding_blocks),
+
+    def y_rotated(self, quarter_turns: int) -> Region:
+        return PointRegion(
+            frozenset(point.y_rotated(quarter_turns) for point in self.points)
+        )
+
+    def __contains__(self, point: Pos) -> bool:
+        return point in self.points
+
+    def __and__(self, other: Region) -> Any:
+        if isinstance(other, PointRegion):
+            return PointRegion(self.points & other.points)
+        elif isinstance(other, (RectangularPrism, CompositeRegion)):
+            return PointRegion(
+                frozenset(point for point in self.points if point in other)
+            )
+        else:
+            return NotImplemented
+
+    def __rand__(self, other: Region) -> Any:
+        return self.__and__(other)
+
+    def __or__(self, other: Region) -> Any:
+        if isinstance(other, PointRegion):
+            return PointRegion(
+                self.points | other.points,
+            )
+        elif isinstance(other, RectangularPrism):
+            return CompositeRegion(
+                subregions=(self, other),
+            )
+        elif isinstance(other, CompositeRegion):
+            return CompositeRegion(subregions=(*other.subregions, self))
+        else:
+            return NotImplemented
+
+    def __ror__(self, other: Region) -> Any:
+        return self.__or__(other)
+
+    def is_empty(self) -> bool:
+        return len(self.points) == 0
+
+    def __str__(self) -> str:
+        points_str = pformat(set(self.points))
+        prefix = "PointRegion("
+        points_str = points_str.replace("\n", "\n" + " " * len(prefix))
+        return f"PointRegion({points_str})"
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
+@dataclass(frozen=True)
 class RectangularPrism(Region):
     """
     Inclusive on all edges.
@@ -449,6 +530,9 @@ class RectangularPrism(Region):
         """
         >>> RectangularPrism(Pos(0, 0, 0), Pos(1, 2, 3)).xz_padded()
         RectangularPrism(Pos(-1, 0, -1), Pos(2, 2, 4))
+
+        >>> RectangularPrism(Pos(20, 12, 11), Pos(34, 13, 14)).xz_padded()
+        RectangularPrism(Pos(19, 12, 10), Pos(35, 13, 15))
         """
         return RectangularPrism(
             min_pos=self.min_pos - Pos(padding_blocks, 0, padding_blocks),
@@ -577,34 +661,32 @@ class CompositeRegion(Region):
         return all(region.is_empty() for region in self.subregions)
 
 
-def any_overlap(regions: set[Region]) -> bool:
+def any_overlap(regions: list[Region]) -> bool:
     """
     TODO: Use AABB bounds to speed this up.
 
-    >>> any_overlap({
+    >>> any_overlap([
     ...     CompositeRegion((
     ...         RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
     ...         RectangularPrism(Pos(10, 0, 0), Pos(10, 0, 0)),
     ...         RectangularPrism(Pos(0, 0, 10), Pos(5, 5, 15)),
     ...     )),
     ...     RectangularPrism(Pos(0, 10, 0), Pos(5, 15, 5)),
-    ... })
+    ... ])
     False
 
-    >>> any_overlap({
+    >>> any_overlap([
     ...     CompositeRegion((
     ...         RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
     ...         RectangularPrism(Pos(0, 0, 10), Pos(5, 5, 15)),
     ...     )),
     ...     RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
     ...     RectangularPrism(Pos(5, 0, 0), Pos(10, 5, 5)),
-    ... })
+    ... ])
     True
     """
-    ordered_regions = list(regions)
-
     return any(
         left.intersects(right)
-        for left_index, left in enumerate(ordered_regions)
-        for right in ordered_regions[left_index + 1 :]
+        for left_index, left in enumerate(regions)
+        for right in regions[left_index + 1 :]
     )
