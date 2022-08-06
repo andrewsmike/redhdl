@@ -17,7 +17,11 @@ from redhdl.region import (
     xz_directions,
 )
 from redhdl.schematic import Block, Schematic
-from redhdl.tree_search import TreeSearchProblem, a_star_iddfs_searched_solution
+from redhdl.tree_search import (
+    SearchError,
+    TreeSearchProblem,
+    a_star_iddfs_searched_solution,
+)
 
 
 @dataclass
@@ -52,19 +56,25 @@ class PathFindingProblem(TreeSearchProblem[Pos, Pos]):
         return (state - self.stop_point).l1()
 
 
+class BussingError(BaseException):
+    pass
+
+
 def bus_path(
     blocked_regions: Region,
     source_port: Pos,
     dest_port: Pos,
 ) -> list[Pos]:
-    """ """
     problem = PathFindingProblem(
         start_point=source_port,
         stop_point=dest_port,
         blocked_regions=blocked_regions,
     )
 
-    return [source_port] + a_star_iddfs_searched_solution(problem, max_steps=4_000)
+    try:
+        return [source_port] + a_star_iddfs_searched_solution(problem, max_steps=4_000)
+    except SearchError as e:
+        raise BussingError(str(e))
 
 
 def placement_pin_seq_points(
