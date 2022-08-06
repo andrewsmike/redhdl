@@ -60,7 +60,7 @@ True
 from dataclasses import dataclass
 from functools import cache
 from pprint import pformat
-from typing import Any, Iterator, Literal, NamedTuple, cast
+from typing import Any, Iterator, Literal, NamedTuple, TypeGuard, cast
 
 from redhdl.slice import Slice
 
@@ -72,6 +72,10 @@ X_AXIS, Y_AXIS, Z_AXIS = axes = cast(list[Axis], [0, 1, 2])
 
 # Direction: Axis, is_positive
 Direction = Literal["up", "down", "north", "east", "south", "west"]
+
+
+def is_direction(value: str) -> TypeGuard[Direction]:
+    return value in ["up", "down", "north", "east", "south", "west"]
 
 
 # Ordered by right-hand-rule rotations on the y axis.

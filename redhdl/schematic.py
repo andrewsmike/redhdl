@@ -1,4 +1,36 @@
 """
+>>> from pprint import pprint
+>>> schem = load_schem("schematic_examples/hdl_diagonal_not.schem")
+>>> pprint(schem)
+Schematic(pos_blocks={Pos(0, 0, 0): Block(block_type='minecraft:oak_wall_sign',
+                                          attributes=frozendict.frozendict({'facing': 'north', 'waterlogged': 'false'})),
+                      Pos(0, 0, 1): Block(block_type='minecraft:glass',
+                                          attributes=frozendict.frozendict({})),
+                      ...,
+                      Pos(2, 2, 2): Block(block_type='minecraft:comparator',
+                                          attributes=frozendict.frozendict({'facing': 'west', 'mode': 'subtract', 'powered': 'true'})),
+                      Pos(3, 2, 2): Block(block_type='minecraft:gray_wool',
+                                          attributes=frozendict.frozendict({})),
+                      Pos(3, 2, 3): Block(block_type='minecraft:repeater',
+                                          attributes=frozendict.frozendict({'delay': '1', 'facing': 'north', 'locked': 'false', 'powered': 'true'})),
+                      ...},
+          pos_sign_lines={Pos(0, 0, 0): ['diagonal not', 'stack i=[1x+1y]'],
+                          Pos(2, 1, 0): ['input a[i]',
+                                         'full soft power',
+                                         'hard power'],
+                          Pos(3, 1, 4): ['output b[i]',
+                                         'full soft power',
+                                         'full hard power'],
+                          Pos(4, 3, 4): ['PLACEHOLDER']})
+
+>>> pprint(schem.y_rotated(1))
+Schematic(pos_blocks={Pos(0, 0, 0): Block(block_type='minecraft:oak_wall_sign',
+                                          attributes=frozendict.frozendict({'facing': 'west', 'waterlogged': 'false'})),
+                      ...,
+                      Pos(1, 2, -2): Block(block_type='minecraft:repeater',
+                                           attributes=frozendict.frozendict({'delay': '1', 'facing': 'west', 'locked': 'false', 'powered': 'false'})),
+                      ...},
+          pos_sign_lines=...)
 """
 
 from dataclasses import dataclass
@@ -10,7 +42,16 @@ from nbtlib import load
 from nbtlib.tag import ByteArray, Compound, Int, Short
 
 from redhdl.positional_data import PositionalData, PositionMask
-from redhdl.region import X_AXIS, Y_AXIS, Z_AXIS, Pos, RectangularPrism
+from redhdl.region import (
+    X_AXIS,
+    Y_AXIS,
+    Z_AXIS,
+    Direction,
+    Pos,
+    RectangularPrism,
+    is_direction,
+    xz_direction_y_rotated,
+)
 
 
 @dataclass(frozen=True, order=True)
@@ -21,9 +62,19 @@ class Block:
     def is_air(self) -> bool:
         return self.block_type == "minecraft:air"
 
-    def y_rotated(self, quarter_turns: int) -> "Block":
-        # TODO.
-        raise NotImplementedError
+    def y_rotated(self, quarter_turns: int = 1) -> "Block":
+        attributes = self.attributes
+        if "facing" in self.attributes:
+            direction: str | Direction = self.attributes["facing"]
+            assert is_direction(direction)
+            attributes = frozendict(
+                attributes
+                | {"facing": xz_direction_y_rotated(direction, quarter_turns)}
+            )
+        return Block(
+            block_type=self.block_type,
+            attributes=attributes,
+        )
 
     def to_str(self) -> str:
         if self.attributes:
@@ -82,7 +133,10 @@ class Schematic:
                 (pos.y_rotated(quarter_turns), block.y_rotated(quarter_turns))
                 for pos, block in self.pos_blocks.items()
             ),
-            pos_sign_lines=self.pos_sign_lines,
+            pos_sign_lines=PositionalData(
+                (pos.y_rotated(quarter_turns), sign_lines)
+                for pos, sign_lines in self.pos_sign_lines.items()
+            ),
         )
 
     def shifted(self, offset: Pos) -> "Schematic":
@@ -121,6 +175,10 @@ class Schematic:
 
 def load_schem(path: str) -> Schematic:
     schem = load(path)
+
+    if "Schematic" in schem:
+        schem = schem["Schematic"]
+
     block_by_palette_index = {
         int(palette_index): Block.from_str(block_type)
         for block_type, palette_index in schem["Palette"].items()
@@ -151,7 +209,7 @@ def load_schem(path: str) -> Schematic:
                 for line_index in range(1, 5)
                 if (text := loads(entity[f"Text{line_index}"])["text"])
             ]
-            for entity in schem["BlockEntities"]
+            for entity in schem.get("BlockEntities", [])
             if entity["Id"] == "minecraft:sign"
         }
     )
@@ -180,8 +238,13 @@ def save_schem(schematic: Schematic, dest_path: str):
         max_pos = Pos(0, 0, 0)
 
     block_type_palette_index = {
-        block_type: index
-        for index, block_type in enumerate(sorted(set(blocks.values()) | {air_block}))
+        block: index
+        for index, block in enumerate(
+            sorted(
+                {block for block in blocks.values()} | {air_block},
+                key=lambda block: (block.block_type, set(block.attributes.items())),
+            )
+        )
     }
 
     encoded_pos_blocks = bytearray()
@@ -197,11 +260,11 @@ def save_schem(schematic: Schematic, dest_path: str):
         for block_type, block_type_palette_index in block_type_palette_index.items()
     }
     nbt_data = {
-        "Schematic": Compound(
+        "schematic": Compound(
             {
                 "Version": Int(2),
                 "DataVersion": Int(2584),
-                "MetaData": Compound(
+                "Metadata": Compound(
                     {
                         "WEOffsetX": Int(we_pos[X_AXIS]),
                         "WEOffsetY": Int(we_pos[Y_AXIS]),
@@ -216,9 +279,10 @@ def save_schem(schematic: Schematic, dest_path: str):
                 "BlockData": ByteArray(encoded_pos_blocks),
             }
         )
-    }
+    }["schematic"]
 
     schem = NBTFile(nbt_data, gzipped=True)
+    schem.root_name = "Schematic"
     schem.save(dest_path)
 
     return nbt_data
