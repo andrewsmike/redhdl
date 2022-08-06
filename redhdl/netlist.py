@@ -268,6 +268,10 @@ class Netlist:
             )
         )
 
+    def port(self, port_id: PortId) -> Port:
+        instance_id, port_name = port_id
+        return self.instances[instance_id].ports[port_name]
+
     @property
     def next_network_id(self) -> NetworkId:
         """Next available Network for netlist manipulations."""
