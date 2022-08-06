@@ -8,7 +8,7 @@ State = TypeVar("State")
 Action = TypeVar("Action")
 
 
-class TreeSearchProblem(Generic[State, Action], metaclass=ABCMeta):
+class PathSearchProblem(Generic[State, Action], metaclass=ABCMeta):
     @abstractmethod
     def initial_state(self) -> State:
         pass
@@ -51,7 +51,7 @@ class Step(Generic[State, Action]):
 
         return list(reversed(sequence))[1:]  # First action is always None.
 
-    def next_steps(self, problem: TreeSearchProblem) -> Generator["Step", None, None]:
+    def next_steps(self, problem: PathSearchProblem) -> Generator["Step", None, None]:
         for action in sorted(problem.state_actions(self.state)):
             yield Step(
                 state=(next_state := problem.state_action_result(self.state, action)),
@@ -107,7 +107,7 @@ class SearchTimeoutError(SearchError):
 
 
 def a_star_iddfs_searched_solution(
-    problem: TreeSearchProblem[State, Action],
+    problem: PathSearchProblem[State, Action],
     max_steps: int = 10_000,
 ) -> list[Action]:
     """Iterative deepening depth first A* search.
@@ -128,7 +128,7 @@ def a_star_iddfs_searched_solution(
     state_min_cost: dict[State, float] = {}  # Accumulate over all runs.
 
     def subtree_solution_should_continue(
-        problem: TreeSearchProblem[State, Action],
+        problem: PathSearchProblem[State, Action],
         step: Step,
         max_cost: float,
     ) -> tuple[Step | None, bool, float | None]:
@@ -180,7 +180,7 @@ def a_star_iddfs_searched_solution(
         if solution:
             return solution.action_sequence()
         elif not still_unexplored_space:
-            raise NoSolutionError("Tree search problem has no solutions.")
+            raise NoSolutionError("Path search problem has no solutions.")
         else:
             assert isinstance(min_cost, (float, int))  # For MyPy.
             max_cost = max(max_cost + 1, min_cost)
@@ -189,7 +189,7 @@ def a_star_iddfs_searched_solution(
 
 
 def a_star_bfs_searched_solution(
-    problem: TreeSearchProblem[State, Action],
+    problem: PathSearchProblem[State, Action],
     max_steps: int = 10_000,
 ) -> list[Action]:
 

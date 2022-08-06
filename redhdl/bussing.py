@@ -6,6 +6,11 @@ from frozendict import frozendict
 
 from redhdl.instances import RepeaterPort
 from redhdl.netlist import Netlist, PinId, PinIdSequence
+from redhdl.path_search import (
+    PathSearchProblem,
+    SearchError,
+    a_star_iddfs_searched_solution,
+)
 from redhdl.placement import InstancePlacement, placement_region, placement_schematic
 from redhdl.positional_data import PositionalData
 from redhdl.region import (
@@ -17,15 +22,10 @@ from redhdl.region import (
     xz_directions,
 )
 from redhdl.schematic import Block, Schematic
-from redhdl.tree_search import (
-    SearchError,
-    TreeSearchProblem,
-    a_star_iddfs_searched_solution,
-)
 
 
 @dataclass
-class PathFindingProblem(TreeSearchProblem[Pos, Pos]):
+class PathFindingProblem(PathSearchProblem[Pos, Pos]):
     start_point: Pos
     stop_point: Pos
     blocked_regions: Region
