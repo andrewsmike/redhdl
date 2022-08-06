@@ -182,7 +182,7 @@ def a_star_iddfs_searched_solution(
         elif not still_unexplored_space:
             raise NoSolutionError("Tree search problem has no solutions.")
         else:
-            assert isinstance(min_cost, float)  # For MyPy.
+            assert isinstance(min_cost, (float, int))  # For MyPy.
             max_cost = max(max_cost + 1, min_cost)
     else:
         raise SearchTimeoutError(f"Could not find solution in {max_steps} steps.")
