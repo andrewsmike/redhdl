@@ -28,7 +28,7 @@ class LocalSearchProblem(Generic[Solution], metaclass=ABCMeta):
         pass
 
 
-def searched_for_solution(
+def sim_annealing_searched_solution(
     problem: LocalSearchProblem[Solution],
     total_rounds: int = 2_000,
     restarts: int = 1,

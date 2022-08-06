@@ -60,6 +60,7 @@ True
 from dataclasses import dataclass
 from functools import cache
 from pprint import pformat
+from random import randint
 from typing import Any, Iterator, Literal, NamedTuple, TypeGuard, cast
 
 from redhdl.slice import Slice
@@ -286,6 +287,14 @@ direction_unit_pos = {
     "up": Pos(0, 1, 0),
     "south": Pos(0, 0, 1),
 }
+
+
+def random_pos(inclusive_max_pos: Pos) -> Pos:
+    return Pos(
+        randint(0, inclusive_max_pos.x),
+        randint(0, inclusive_max_pos.y),
+        randint(0, inclusive_max_pos.z),
+    )
 
 
 @dataclass(frozen=True)

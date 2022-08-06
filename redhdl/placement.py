@@ -1,11 +1,14 @@
+from dataclasses import dataclass
 from functools import reduce
 from operator import or_
 from random import choice, random, sample
 from typing import cast
 
 from frozendict import frozendict
+from tqdm import tqdm
 
 from redhdl.instances import SchematicInstance
+from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
 from redhdl.netlist import InstanceId, Netlist
 from redhdl.region import (
     CompositeRegion,
@@ -14,6 +17,7 @@ from redhdl.region import (
     any_overlap,
     direction_unit_pos,
     is_direction,
+    random_pos,
     xz_directions,
 )
 
@@ -62,6 +66,84 @@ def placement_region(netlist: Netlist, placement: InstancePlacement) -> Composit
     )
 
 
+MAX_PLACEMENT_ATTEMPTS = 40
+
+
+def netlist_random_placement(netlist: Netlist) -> InstancePlacement:
+    assert all(
+        isinstance(instance, SchematicInstance)
+        for instance in netlist.instances.values()
+    )
+
+    instances: dict[str, SchematicInstance] = cast(
+        dict[str, SchematicInstance],
+        {name: instance for name, instance in netlist.instances.items()},
+    )
+
+    max_area: Pos = sum(
+        (instance.region.max_pos + Pos(1, 1, 1) for instance in instances.values()),
+        start=Pos(0, 0, 0),
+    ) + Pos(
+        8, 8, 8
+    )  # TODO: Make less arbitrary.
+
+    placement: InstancePlacement = frozendict()
+    for instance_name, instance in instances.items():
+        for i in range(MAX_PLACEMENT_ATTEMPTS):
+            pos = random_pos(max_area - instance.region.max_pos - Pos(1, 1, 1))
+            direction = choice(xz_directions)
+            assert is_direction(direction)  # For MyPy.
+            suggested_placement: InstancePlacement = frozendict(
+                {**placement, instance_name: (pos, direction)}
+            )
+            if placement_valid(netlist, suggested_placement, xz_padding=3):
+                placement = suggested_placement
+                break
+        else:
+            raise TimeoutError(
+                "Couldn't find an appropriate placement for a component "
+                + f"({MAX_PLACEMENT_ATTEMPTS} attempts)."
+            )
+
+    return placement
+
+
+def placement_compactness_score(
+    netlist: Netlist, placement: InstancePlacement
+) -> float:
+    region = placement_region(netlist, placement)
+    return -sum(region.max_pos - region.min_pos)  # type: ignore
+
+
+def random_searched_compact_placement(
+    netlist: Netlist,
+    max_iterations: int = 60_000,
+    show_progressbar: bool = True,
+) -> InstancePlacement:
+    """Brute-force random search for compact placements."""
+
+    if show_progressbar:
+        it = tqdm(range(max_iterations))
+    else:
+        it = range(max_iterations)
+
+    best_cost = None
+    best_placement = None
+    for i in it:
+        if i % (max_iterations // 12) == 0:
+            print(f"Best cost: {best_cost}")
+
+        next_placement = netlist_random_placement(netlist)
+        next_cost = -placement_compactness_score(netlist, next_placement)
+        if best_cost is None or next_cost < best_cost:
+            best_cost, best_placement = next_cost, next_placement
+
+    print(f"Best cost: {best_cost}")
+
+    assert best_placement is not None  # For MyPy.
+    return best_placement
+
+
 direction_unit_poses = list(direction_unit_pos.values())
 
 
@@ -96,4 +178,31 @@ def mutated_placement(
             )
             for instance_id, placement in placement.items()
         }
+    )
+
+
+@dataclass
+class PlacementProblem(LocalSearchProblem[InstancePlacement]):
+    netlist: Netlist
+
+    def random_solution(self) -> InstancePlacement:
+        return netlist_random_placement(self.netlist)
+
+    def mutated_solution(self, solution: InstancePlacement) -> InstancePlacement:
+        return mutated_placement(self.netlist, solution)
+
+    def solution_cost(self, solution: InstancePlacement) -> float:
+        if not placement_valid(self.netlist, solution):
+            return 10000
+
+        return -placement_compactness_score(self.netlist, solution)
+
+
+def sim_annealing_searched_compact_placement(
+    netlist: Netlist,
+    max_iterations: int = 60_000,
+) -> InstancePlacement:
+    placement_problem = PlacementProblem(netlist)
+    return sim_annealing_searched_solution(
+        placement_problem, total_rounds=max_iterations
     )
