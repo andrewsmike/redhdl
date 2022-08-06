@@ -2,9 +2,12 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import Iterable
 
+from frozendict import frozendict
+
 from redhdl.instances import RepeaterPort
 from redhdl.netlist import Netlist, PinId, PinIdSequence
-from redhdl.placement import InstancePlacement, placement_region
+from redhdl.placement import InstancePlacement, placement_region, placement_schematic
+from redhdl.positional_data import PositionalData
 from redhdl.region import (
     PointRegion,
     Pos,
@@ -13,6 +16,7 @@ from redhdl.region import (
     direction_unit_pos,
     xz_directions,
 )
+from redhdl.schematic import Block, Schematic
 from redhdl.tree_search import TreeSearchProblem, a_star_iddfs_searched_solution
 
 
@@ -164,3 +168,37 @@ def dest_pin_bus_path(
         )
 
     return dest_pin_bus_path
+
+
+def bus_trace_pos_blocks(bus_paths: dict[PinId, list[Pos]]) -> PositionalData[Block]:
+    return PositionalData(
+        {
+            bus_point: Block("minecraft:blue_wool", frozendict())
+            for pin_id, bus_points in bus_paths.items()
+            for bus_point in bus_points
+        }
+    )
+
+
+def bussed_placement_schematic(
+    netlist: Netlist,
+    placement: InstancePlacement,
+    bus_paths: dict[PinId, list[Pos]],
+) -> Schematic:
+    schem = placement_schematic(netlist, placement)
+    schem.pos_blocks |= bus_trace_pos_blocks(bus_paths)
+    return schem
+
+
+def bussing_cost(bus_paths: dict[PinId, list[Pos]]) -> float:
+    return (
+        sum(len(bus_points) for bus_points in bus_paths.values()) / len(bus_paths) / 3
+    )
+
+
+def bussing_min_cost(netlist: Netlist, placement: InstancePlacement) -> float:
+    l1s = [
+        (pin_pos_pair.dest_pin_pos - pin_pos_pair.source_pin_pos).l1()
+        for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement)
+    ]
+    return sum(l1s) / len(l1s) / 3
