@@ -32,7 +32,8 @@ def sim_annealing_searched_solution(
     problem: LocalSearchProblem[Solution],
     total_rounds: int = 2_000,
     restarts: int = 1,
-    rounds_per_print: int = 50,
+    rounds_per_print: int | None = None,
+    show_progressbar: bool = False,
 ) -> Solution:
     # We use random restarts, so we need to track
     # the best we saw throughout all the restart periods.
@@ -41,13 +42,18 @@ def sim_annealing_searched_solution(
 
     rounds_per_restart = total_rounds // restarts
 
-    for i in tqdm(range(total_rounds)):
+    if show_progressbar:
+        it = tqdm(range(total_rounds))
+    else:
+        it = range(total_rounds)
+
+    for i in it:
         if i % rounds_per_restart == 0:
             candidate_solution = problem.random_solution()
         else:
             assert current_solution is not None  # For MyPy.
             candidate_solution = problem.mutated_solution(current_solution)
-        if i % rounds_per_print == 0:
+        if rounds_per_print is not None and i % rounds_per_print == 0:
             print(best_cost)
 
         candidate_cost = problem.solution_cost(candidate_solution)

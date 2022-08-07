@@ -9,7 +9,7 @@ from redhdl.netlist import Netlist, PinId, PinIdSequence
 from redhdl.path_search import (
     PathSearchProblem,
     SearchError,
-    a_star_iddfs_searched_solution,
+    a_star_bfs_searched_solution,
 )
 from redhdl.placement import InstancePlacement, placement_region, placement_schematic
 from redhdl.positional_data import PositionalData
@@ -22,6 +22,69 @@ from redhdl.region import (
     xz_directions,
 )
 from redhdl.schematic import Block, Schematic
+
+
+def placement_pin_seq_points(
+    netlist: Netlist,
+    pin_id_seq: PinIdSequence,
+    placement: InstancePlacement,
+) -> PositionSequence:
+    """The position sequence corresponding to the given PinIdSequence in a given placement."""
+    port = netlist.port(pin_id_seq.port_id)
+
+    if not isinstance(port, RepeaterPort):
+        raise ValueError(
+            "pin_id_seq_points() doesn't support anything but RepeaterPorts."
+        )
+
+    base_pin_points = (port.positions & pin_id_seq.slice) + Pos(0, 1, 0)
+
+    # Offset back/forward for inputs/outputs.
+    pin_points = {
+        "output": base_pin_points + direction_unit_pos[port.facing],
+        "input": base_pin_points - direction_unit_pos[port.facing],
+    }[port.port_type]
+
+    instance_id, _ = pin_id_seq.port_id
+    instance_pos, instance_dir = placement[instance_id]
+
+    return pin_points.y_rotated(xz_directions.index(instance_dir)) + instance_pos
+
+
+@dataclass(frozen=True, order=True)
+class PinPosPair:
+    source_pin_id: PinId
+    source_pin_pos: Pos
+    dest_pin_id: PinId
+    dest_pin_pos: Pos
+
+
+def source_dest_pin_pos_pairs(
+    netlist: Netlist,
+    placement: InstancePlacement,
+) -> Iterable[PinPosPair]:
+    """The pin@pos -> pin@pos pairs of a network + placement."""
+    for network_id, network in netlist.networks.items():
+        source_pin_points = placement_pin_seq_points(
+            netlist, network.input_pin_id_seq, placement
+        )
+
+        for dest_pin_id_seq in network.output_pin_id_seqs:
+            dest_pin_points = placement_pin_seq_points(
+                netlist, dest_pin_id_seq, placement
+            )
+
+            for (source_pin_id, source_pin_pos), (dest_pin_id, dest_pin_pos) in zip(
+                zip(network.input_pin_id_seq.slice, source_pin_points),
+                zip(dest_pin_id_seq.slice, dest_pin_points),
+            ):
+
+                yield PinPosPair(
+                    source_pin_id=(network.input_pin_id_seq.port_id, source_pin_id),
+                    source_pin_pos=source_pin_pos,
+                    dest_pin_id=(dest_pin_id_seq.port_id, dest_pin_id),
+                    dest_pin_pos=dest_pin_pos,
+                )
 
 
 @dataclass
@@ -62,82 +125,19 @@ class BussingError(BaseException):
 
 def bus_path(
     blocked_regions: Region,
-    source_port: Pos,
-    dest_port: Pos,
+    source_point: Pos,
+    dest_point: Pos,
 ) -> list[Pos]:
     problem = PathFindingProblem(
-        start_point=source_port,
-        stop_point=dest_port,
+        start_point=source_point,
+        stop_point=dest_point,
         blocked_regions=blocked_regions,
     )
 
     try:
-        return [source_port] + a_star_iddfs_searched_solution(problem, max_steps=4_000)
+        return [source_point] + a_star_bfs_searched_solution(problem, max_steps=4_000)
     except SearchError as e:
         raise BussingError(str(e))
-
-
-def placement_pin_seq_points(
-    netlist: Netlist,
-    pin_id_seq: PinIdSequence,
-    placement: InstancePlacement,
-) -> PositionSequence:
-    """The position sequence corresponding to the given PinIdSequence in a given placement."""
-    port = netlist.port(pin_id_seq.port_id)
-
-    if not isinstance(port, RepeaterPort):
-        raise ValueError(
-            "pin_id_seq_points() doesn't support anything but RepeaterPorts."
-        )
-
-    base_pin_points = (port.positions & pin_id_seq.slice) + Pos(0, 1, 0)
-
-    # Offset back/forward for inputs/outputs.
-    pin_points = {
-        "output": base_pin_points + direction_unit_pos[port.facing],
-        "input": base_pin_points - direction_unit_pos[port.facing],
-    }[port.port_type]
-
-    instance_id, _ = pin_id_seq.port_id
-    instance_pos, instance_dir = placement[instance_id]
-
-    return pin_points.y_rotated(xz_directions.index(instance_dir)) + instance_pos
-
-
-@dataclass
-class PinPosPair:
-    source_pin_id: PinId
-    source_pin_pos: Pos
-    dest_pin_id: PinId
-    dest_pin_pos: Pos
-
-
-def source_dest_pin_pos_pairs(
-    netlist: Netlist,
-    placement: InstancePlacement,
-) -> Iterable[PinPosPair]:
-    """The pin@pos -> pin@pos pairs of a network + placement."""
-    for network_id, network in netlist.networks.items():
-        source_pin_points = placement_pin_seq_points(
-            netlist, network.input_pin_id_seq, placement
-        )
-
-        for dest_pin_id_seq in network.output_pin_id_seqs:
-            dest_pin_points = placement_pin_seq_points(
-                netlist, dest_pin_id_seq, placement
-            )
-
-            for (source_pin_id, source_pin_pos), (dest_pin_id, dest_pin_pos) in zip(
-                zip(network.input_pin_id_seq.slice, source_pin_points),
-                zip(dest_pin_id_seq.slice, dest_pin_points),
-            ):
-
-                yield PinPosPair(
-                    source_pin_id=(network.input_pin_id_seq.port_id, source_pin_id),
-                    source_pin_pos=source_pin_pos,
-                    dest_pin_id=(dest_pin_id_seq.port_id, dest_pin_id),
-                    dest_pin_pos=dest_pin_pos,
-                )
 
 
 def first_id_cached(func):
@@ -147,10 +147,29 @@ def first_id_cached(func):
     def wrapper(id_obj, *args, **kwargs):
         key = (id(id_obj), tuple(args), tuple(sorted(kwargs.items())))
         if key not in func._cache:
-            func._cache[key] = func(id_obj, *args, **kwargs)
-        return func._cache[key]
+            try:
+                func._cache[key] = (True, func(id_obj, *args, **kwargs))
+            except BaseException as e:
+                func._cache[key] = (False, e)
+
+        success, result = func._cache[key]
+        if success:
+            return result
+        else:
+            raise result
 
     return wrapper
+
+
+def wire_region(path: list[Pos]) -> Region:
+    return PointRegion(
+        frozenset(
+            point + direction_unit_pos[xz_dir] + y_offset
+            for point in path
+            for xz_dir in xz_directions
+            for y_offset in (Pos(0, -1, 0), Pos(0, 0, 0), Pos(0, 1, 0))
+        )
+    )
 
 
 @first_id_cached
@@ -164,18 +183,11 @@ def dest_pin_bus_path(
     for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement):
         path = bus_path(
             blocked_regions=blocks_region,
-            source_port=pin_pos_pair.source_pin_pos,
-            dest_port=pin_pos_pair.dest_pin_pos,
+            source_point=pin_pos_pair.source_pin_pos,
+            dest_point=pin_pos_pair.dest_pin_pos,
         )
         dest_pin_bus_path[pin_pos_pair.dest_pin_id] = path
-        blocks_region = blocks_region | PointRegion(
-            frozenset(
-                point  # + direction_unit_pos[xz_dir] + y_offset
-                for point in path
-                # for xz_dir in xz_directions
-                # for y_offset in (Pos(0, 0, 0), Pos(0, 1, 0))
-            )
-        )
+        blocks_region = blocks_region | wire_region(path)
 
     return dest_pin_bus_path
 

@@ -20,6 +20,7 @@ from redhdl.region import (
     random_pos,
     xz_directions,
 )
+from redhdl.schematic import Schematic
 
 InstancePlacement = frozendict[InstanceId, tuple[Pos, Direction]]
 
@@ -44,7 +45,7 @@ def placement_valid(
     return not any_overlap(instance_regions)
 
 
-def placement_schematic(netlist: Netlist, placement: InstancePlacement):
+def placement_schematic(netlist: Netlist, placement: InstancePlacement) -> Schematic:
     instance_schematics = [
         cast(SchematicInstance, netlist.instances[instance_id])
         .schematic.y_rotated(xz_directions.index(direction))
