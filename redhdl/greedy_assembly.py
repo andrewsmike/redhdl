@@ -6,7 +6,8 @@ from redhdl.bussing import (
     bussed_placement_schematic,
     bussing_cost,
     bussing_min_cost,
-    dest_pin_bus_path,
+    collision_count,
+    dest_pin_relaxed_bus_path,
 )
 from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
 from redhdl.netlist import InstanceId, Netlist
@@ -44,11 +45,11 @@ class GreedyBussingPlacementProblem(LocalSearchProblem[InstancePlacement]):
         placement_cost = -placement_compactness_score(self.netlist, solution)
 
         try:
-            bussing = dest_pin_bus_path(self.netlist, solution)
+            bussing = dest_pin_relaxed_bus_path(self.netlist, solution)
         except BussingError:
             return placement_cost + bussing_min_cost(self.netlist, solution) + 1000
 
-        return placement_cost + bussing_cost(bussing)
+        return placement_cost + bussing_cost(bussing) + collision_count(bussing) * 5
 
 
 def assembled_circuit_schem(
@@ -61,12 +62,22 @@ def assembled_circuit_schem(
     )
     seed(0xDEADBEEF)
     placement_problem = GreedyBussingPlacementProblem(netlist)
-    placement = sim_annealing_searched_solution(placement_problem, total_rounds=1000)
+    placement = sim_annealing_searched_solution(
+        placement_problem,
+        total_rounds=40,
+        show_progressbar=True,
+        rounds_per_print=10,
+    )
     print(f"Best cost: {placement_problem.solution_cost(placement)}")
 
-    bus_paths = dest_pin_bus_path(netlist, placement)
+    bus_paths = dest_pin_relaxed_bus_path(netlist, placement)
+
+    collision_count(bus_paths)
 
     schem = bussed_placement_schematic(netlist, placement, bus_paths)
+    import pdb
+
+    pdb.set_trace()
 
     return schem
 

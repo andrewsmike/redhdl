@@ -1,10 +1,13 @@
 from dataclasses import dataclass
-from functools import wraps
+from functools import reduce, wraps
+import operator
+from random import choice, shuffle
 from typing import Iterable
 
 from frozendict import frozendict
 
 from redhdl.instances import RepeaterPort
+from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
 from redhdl.netlist import Netlist, PinId, PinIdSequence
 from redhdl.path_search import (
     PathSearchProblem,
@@ -224,3 +227,175 @@ def bussing_min_cost(netlist: Netlist, placement: InstancePlacement) -> float:
         for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement)
     ]
     return sum(l1s) / len(l1s) / 3
+
+
+@dataclass
+class RelaxedPathFindingProblem(PathSearchProblem[Pos, Pos]):
+    start_point: Pos
+    stop_point: Pos
+    instance_regions: Region
+    wire_regions: Region
+    collision_cost: float = 5
+
+    def initial_state(self) -> Pos:
+        return self.start_point
+
+    def state_actions(self, state: Pos) -> list[Pos]:
+        return [
+            next_pos
+            for unit_pos in direction_unit_pos.values()
+            if (
+                (next_pos := unit_pos + state) == self.stop_point
+                or next_pos not in self.instance_regions
+            )
+        ]
+
+    def state_action_result(self, state: Pos, action: Pos) -> Pos:
+        return action
+
+    def state_action_cost(self, state: Pos, action: Pos) -> float:
+        return 1 if (action not in self.wire_regions) else self.collision_cost
+
+    def is_goal_state(self, state: Pos) -> bool:
+        return state == self.stop_point
+
+    def min_distance(self, state: Pos) -> float:
+        return (state - self.stop_point).l1()
+
+
+def relaxed_bus_path(
+    instance_regions: Region,
+    wire_regions: Region,
+    source_point: Pos,
+    dest_point: Pos,
+    collision_cost: float,
+) -> list[Pos]:
+    problem = RelaxedPathFindingProblem(
+        start_point=source_point,
+        stop_point=dest_point,
+        instance_regions=instance_regions,
+        wire_regions=wire_regions,
+        collision_cost=collision_cost,
+    )
+
+    try:
+        return [source_point] + a_star_bfs_searched_solution(problem, max_steps=20_000)
+    except SearchError as e:
+        raise BussingError(str(e))
+
+
+BusPaths = dict[PinId, list[Pos]]
+
+
+def collision_count(bus_paths: BusPaths) -> int:
+    taken_points: set[Pos] = set()
+
+    collision_count = 0
+    for path in bus_paths.values():
+        bus_points = set(path)
+        collision_count += len(bus_points & taken_points)
+        taken_points |= bus_points
+
+    return collision_count
+
+
+def random_relaxed_bus_paths(
+    instance_regions: Region,
+    pin_pos_pairs: set[PinPosPair],
+    collision_cost: float,
+) -> BusPaths:
+    wire_regions: Region = PointRegion(frozenset())
+
+    ordered_pin_pos_pairs = sorted(pin_pos_pairs)
+    shuffle(ordered_pin_pos_pairs)
+
+    bus_path = {}
+    for pin_pos_pair in ordered_pin_pos_pairs:
+        path = relaxed_bus_path(
+            instance_regions=instance_regions,
+            wire_regions=wire_regions,
+            source_point=pin_pos_pair.source_pin_pos,
+            dest_point=pin_pos_pair.dest_pin_pos,
+            collision_cost=collision_cost,
+        )
+        bus_path[pin_pos_pair.dest_pin_id] = path
+        wire_regions = wire_regions | wire_region(path)
+
+    return bus_path
+
+
+def mutated_relaxed_bus_paths(
+    instance_regions: Region,
+    pin_pos_pairs: set[PinPosPair],
+    bus_paths: BusPaths,
+    collision_cost: float,
+) -> BusPaths:
+    pin_pos_pair_to_update = choice(sorted(pin_pos_pairs))
+
+    wire_regions = reduce(
+        operator.or_,
+        (
+            wire_region(path)
+            for dest_pin_id, path in bus_paths.items()
+            if dest_pin_id != pin_pos_pair_to_update.dest_pin_id
+        ),
+    )
+
+    new_path = relaxed_bus_path(
+        instance_regions=instance_regions,
+        wire_regions=wire_regions,
+        source_point=pin_pos_pair_to_update.source_pin_pos,
+        dest_point=pin_pos_pair_to_update.dest_pin_pos,
+        collision_cost=collision_cost,
+    )
+    return {**bus_paths, pin_pos_pair_to_update.dest_pin_id: new_path}
+
+
+@dataclass
+class HerdPathFindingProblem(LocalSearchProblem[BusPaths]):
+    netlist: Netlist
+    placement: InstancePlacement
+    collision_cost: float = 3
+
+    @property  # type: ignore
+    @first_id_cached
+    def instance_regions(self) -> Region:
+        return placement_region(self.netlist, self.placement).xz_padded(1)
+
+    @property  # type: ignore
+    @first_id_cached
+    def pin_pos_pairs(self) -> set[PinPosPair]:
+        return set(source_dest_pin_pos_pairs(self.netlist, self.placement))
+
+    def random_solution(self) -> BusPaths:
+        return random_relaxed_bus_paths(
+            self.instance_regions,
+            self.pin_pos_pairs,
+            collision_cost=self.collision_cost,
+        )
+
+    def mutated_solution(self, solution: BusPaths) -> BusPaths:
+        return mutated_relaxed_bus_paths(
+            self.instance_regions,
+            self.pin_pos_pairs,
+            solution,
+            collision_cost=self.collision_cost,
+        )
+
+    def solution_cost(self, solution: BusPaths) -> float:
+        return collision_count(solution) + 1
+
+
+@first_id_cached
+def dest_pin_relaxed_bus_path(
+    netlist: Netlist,
+    placement: InstancePlacement,
+) -> BusPaths:
+
+    problem = HerdPathFindingProblem(
+        netlist=netlist,
+        placement=placement,
+        collision_cost=3,
+    )
+
+    return sim_annealing_searched_solution(problem, total_rounds=150, restarts=1)
