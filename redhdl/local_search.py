@@ -7,7 +7,7 @@ Currently used to identify placements.
 from abc import ABCMeta, abstractmethod
 from math import exp
 from random import random
-from typing import Generic, TypeVar
+from typing import Callable, Generic, TypeVar
 
 from tqdm import tqdm
 
@@ -27,6 +27,9 @@ class LocalSearchProblem(Generic[Solution], metaclass=ABCMeta):
     def solution_cost(self, solution: Solution) -> float:
         pass
 
+    def good_enough(self, solution: Solution) -> bool:
+        return False
+
 
 def sim_annealing_searched_solution(
     problem: LocalSearchProblem[Solution],
@@ -34,11 +37,15 @@ def sim_annealing_searched_solution(
     restarts: int = 1,
     rounds_per_print: int | None = None,
     show_progressbar: bool = False,
+    rounds_per_checkpoint: int | None = None,
+    checkpoint_func: Callable[[int, Solution, float], None] | None = None,
 ) -> Solution:
     # We use random restarts, so we need to track
     # the best we saw throughout all the restart periods.
-    best_cost, best_solution = None, None
-    current_cost, current_solution = None, None
+    best_cost: float | None = None
+    best_solution: Solution | None = None
+    current_cost: float | None = None
+    current_solution: Solution | None = None
 
     rounds_per_restart = total_rounds // restarts
 
@@ -53,10 +60,25 @@ def sim_annealing_searched_solution(
         else:
             assert current_solution is not None  # For MyPy.
             candidate_solution = problem.mutated_solution(current_solution)
+
         if rounds_per_print is not None and i % rounds_per_print == 0:
-            print(best_cost)
+            print(f"\nBest cost: {best_cost}, last cost: {current_cost}")
+
+        if (
+            rounds_per_checkpoint is not None
+            and i % rounds_per_checkpoint == 0
+            and i > 0
+        ):
+            assert best_cost is not None and best_solution is not None  # For MyPy.
+            assert (
+                checkpoint_func is not None
+            ), "Cannot checkpoint without a checkpoint_func."
+            checkpoint_func(i, best_solution, best_cost)
 
         candidate_cost = problem.solution_cost(candidate_solution)
+        if problem.good_enough(candidate_solution):
+            print(f"Good enough at {i}/{total_rounds}")
+            return candidate_solution
 
         accept_solution = (
             current_cost is None
