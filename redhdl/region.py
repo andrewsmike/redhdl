@@ -2,11 +2,12 @@
 Simple 3d region representation and manipulation library.
 
 Region types:
+- Point prisms
 - Rectangular prisms
 - Composite regions
 - TODO: Efficient diagonal polyhedra for diagonal circuits.
 
-
+Example usages:
 >>> from pprint import pprint
 >>> from redhdl.region import CompositeRegion, RectangularPrism
 
@@ -56,9 +57,9 @@ True
 >>> composite_w_big_boi.intersects(just_beyond)
 True
 """
-
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
-from functools import cache
+from functools import cache, cached_property
 from pprint import pformat
 from random import randint
 from typing import Any, Iterator, Literal, NamedTuple, TypeGuard, cast
@@ -75,8 +76,11 @@ X_AXIS, Y_AXIS, Z_AXIS = axes = cast(list[Axis], [0, 1, 2])
 Direction = Literal["up", "down", "north", "east", "south", "west"]
 
 
+directions: list[Direction] = ["up", "down", "north", "east", "south", "west"]
+
+
 def is_direction(value: str) -> TypeGuard[Direction]:
-    return value in ["up", "down", "north", "east", "south", "west"]
+    return value in directions
 
 
 # Ordered by right-hand-rule rotations on the y axis.
@@ -418,30 +422,48 @@ class PositionSequence:
         return f"PositionSequence({self.start}, {self.stop}, count={self.count})"
 
 
-class Region:
+class Region(metaclass=ABCMeta):
     min_pos: Pos
     max_pos: Pos
 
+    @abstractmethod
     def xz_padded(self, padding_blocks: int = 1) -> "Region":
         pass
 
+    @abstractmethod
     def y_rotated(self, quarter_turns: int) -> "Region":
         pass
 
+    @abstractmethod
     def shifted(self, offset: Pos) -> "Region":
         pass
 
+    @abstractmethod
     def __or__(self, other: "Region") -> Any:
-        return NotImplemented
+        pass
 
+    @abstractmethod
     def __and__(self, other: "Region") -> Any:
-        return NotImplemented
+        pass
 
+    def __len__(self) -> int:
+        return len(list(self))
+
+    @abstractmethod
+    def __iter__(self) -> Iterator[Pos]:
+        pass
+
+    @cache
+    def region_points(self) -> frozenset[Pos]:
+        return frozenset(self)
+
+    @abstractmethod
     def __contains__(self, point: Pos) -> bool:
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def is_empty(self) -> bool:
-        raise NotImplementedError
+        pass
 
     def intersects(self, other: "Region") -> bool:
         return not (self & other).is_empty()
@@ -477,6 +499,12 @@ class PointRegion(Region):
         return PointRegion(
             frozenset(point.y_rotated(quarter_turns) for point in self.points)
         )
+
+    def __len__(self) -> int:
+        return len(self.points)
+
+    def __iter__(self) -> Iterator[Pos]:
+        return iter(self.points)
 
     def __contains__(self, point: Pos) -> bool:
         return point in self.points
@@ -561,6 +589,20 @@ class RectangularPrism(Region):
             max_pos=Pos.elem_max(a, b),
         )
 
+    def __len__(self) -> int:
+        """
+        >>> len(RectangularPrism(Pos(0, 0, 0), Pos(1, 1, 1)))
+        8
+        """
+        width, height, depth = self.max_pos - self.min_pos + Pos(1, 1, 1)
+        return width * height * depth
+
+    def __iter__(self) -> Iterator[Pos]:
+        for x in range(self.min_pos.x, self.max_pos.x + 1):
+            for y in range(self.min_pos.y, self.max_pos.y + 1):
+                for z in range(self.min_pos.z, self.max_pos.z + 1):
+                    yield Pos(x, y, z)
+
     def __contains__(self, point: Pos) -> bool:
         return self.min_pos <= point <= self.max_pos
 
@@ -606,13 +648,11 @@ class CompositeRegion(Region):
 
     subregions: tuple[Region, ...]
 
-    @property  # type: ignore
-    @cache
+    @cached_property
     def min_pos(self) -> Pos:  # type: ignore
         return Pos.elem_min(*[region.min_pos for region in self.subregions])
 
-    @property  # type: ignore
-    @cache
+    @cached_property
     def max_pos(self) -> Pos:  # type: ignore
         return Pos.elem_max(*[region.max_pos for region in self.subregions])
 
@@ -633,6 +673,25 @@ class CompositeRegion(Region):
             )
         )
 
+    @cache
+    def __len__(self) -> int:
+        """
+        The area taken by a set of overlapping regions is a hard problem.
+        This method will not scale gracefully to large numbers of subregions.
+        """
+        block_count = 0
+        counted_regions = CompositeRegion(tuple())
+        for subregion in self.subregions:
+            # Invariant: len(counted_region.subregions) < len(self.subregions)
+            # Base case: len(self.subregions) == 0, return 0.
+            block_count += len(subregion) - len(subregion & counted_regions)
+            counted_regions |= subregion
+
+        return block_count
+
+    def __iter__(self) -> Iterator[Pos]:
+        return iter({point for region in self.subregions for point in region})
+
     def __contains__(self, point: Pos) -> bool:
         return any(point in region for region in self.subregions)
 
@@ -641,10 +700,21 @@ class CompositeRegion(Region):
             return CompositeRegion(
                 subregions=(*self.subregions, *other.subregions),
             )
-        else:
-            return CompositeRegion(
-                subregions=(*self.subregions, other),
-            )
+
+        if isinstance(other, PointRegion):
+            for index, region in enumerate(self.subregions):
+                if isinstance(region, PointRegion):
+                    return CompositeRegion(
+                        subregions=(
+                            self.subregions[:index]
+                            + (region | other,)
+                            + self.subregions[index + 1 :]
+                        )
+                    )
+
+        return CompositeRegion(
+            subregions=(*self.subregions, other),
+        )
 
     def __ror__(self, other: Region) -> Any:
         return self.__or__(other)
@@ -672,6 +742,10 @@ class CompositeRegion(Region):
 
     def is_empty(self) -> bool:
         return all(region.is_empty() for region in self.subregions)
+
+    @cache
+    def region_points(self) -> frozenset[Pos]:
+        return frozenset.union(*(region.region_points() for region in self.subregions))
 
 
 def any_overlap(regions: list[Region]) -> bool:
