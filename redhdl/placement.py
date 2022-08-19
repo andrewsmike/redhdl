@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import reduce
+from itertools import combinations
 from operator import or_
 from random import choice, random, sample
 from typing import Iterable, cast
@@ -185,6 +186,28 @@ def placement_compactness_score(
     return -sum(region.max_pos - region.min_pos)  # type: ignore
 
 
+MAX_PADDING = 4
+
+
+def instance_buffer_blocks(netlist: Netlist, placement: InstancePlacement) -> float:
+    region = placement_region(netlist, placement)
+    for padding in range(1, MAX_PADDING):
+        padded_regions = [
+            subregion.xz_padded(padding) for subregion in region.subregions
+        ]
+        collision_count = sum(
+            left.intersects(right) for left, right in combinations(padded_regions, 2)
+        )
+        if collision_count > 0:
+            return (
+                padding
+                - 1
+                + collision_count / len(list(combinations(padded_regions, 2)))
+            )
+
+    return MAX_PADDING
+
+
 def random_searched_compact_placement(
     netlist: Netlist,
     max_iterations: int = 60_000,
@@ -222,20 +245,17 @@ def mutated_individual_placement(
 ) -> tuple[Pos, Direction]:
     direction: str | Direction
     pos, direction = placement
-    if random() < 0.25:
+    if random() < 0.1:
         direction = choice(xz_directions)
 
-    if random() < 0.8:
-        pos += choice(direction_unit_poses)
+    pos += choice(direction_unit_poses)
 
     assert is_direction(direction)
 
     return (pos, direction)
 
 
-def mutated_placement(
-    netlist: Netlist, placement: InstancePlacement
-) -> InstancePlacement:
+def mutated_placement(placement: InstancePlacement) -> InstancePlacement:
     instances_to_tweak_count = max(len(placement) // 3, 2)
     instances_to_tweak = sample(list(placement.keys()), k=instances_to_tweak_count)
 
@@ -259,7 +279,7 @@ class PlacementProblem(LocalSearchProblem[InstancePlacement]):
         return netlist_random_placement(self.netlist)
 
     def mutated_solution(self, solution: InstancePlacement) -> InstancePlacement:
-        return mutated_placement(self.netlist, solution)
+        return mutated_placement(solution)
 
     def solution_cost(self, solution: InstancePlacement) -> float:
         if not placement_valid(self.netlist, solution):
