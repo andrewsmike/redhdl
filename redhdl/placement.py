@@ -2,20 +2,22 @@ from dataclasses import dataclass
 from functools import reduce
 from operator import or_
 from random import choice, random, sample
-from typing import cast
+from typing import Iterable, cast
 
 from frozendict import frozendict
 from tqdm import tqdm
 
-from redhdl.instances import SchematicInstance
+from redhdl.instances import RepeaterPort, SchematicInstance
 from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
-from redhdl.netlist import InstanceId, Netlist
+from redhdl.netlist import InstanceId, Netlist, PinId, PinIdSequence
 from redhdl.region import (
     CompositeRegion,
     Direction,
     Pos,
+    PositionSequence,
     any_overlap,
     direction_unit_pos,
+    display_regions,
     is_direction,
     random_pos,
     xz_directions,
@@ -65,6 +67,73 @@ def placement_region(netlist: Netlist, placement: InstancePlacement) -> Composit
             for instance_id, (pos, direction) in placement.items()
         )
     )
+
+
+def placement_pin_seq_points(
+    netlist: Netlist,
+    pin_id_seq: PinIdSequence,
+    placement: InstancePlacement,
+) -> PositionSequence:
+    """The position sequence corresponding to the given PinIdSequence in a given placement."""
+    port = netlist.port(pin_id_seq.port_id)
+
+    if not isinstance(port, RepeaterPort):
+        raise ValueError(
+            "pin_id_seq_points() doesn't support anything but RepeaterPorts."
+        )
+
+    base_pin_points = (port.positions & pin_id_seq.slice) + Pos(0, 1, 0)
+
+    # Offset back/forward for inputs/outputs.
+    pin_points = {
+        "output": base_pin_points + direction_unit_pos[port.facing],
+        "input": base_pin_points - direction_unit_pos[port.facing],
+    }[port.port_type]
+
+    instance_id, _ = pin_id_seq.port_id
+    instance_pos, instance_dir = placement[instance_id]
+
+    return pin_points.y_rotated(xz_directions.index(instance_dir)) + instance_pos
+
+
+@dataclass(frozen=True, order=True)
+class PinPosPair:
+    source_pin_id: PinId
+    source_pin_pos: Pos
+    dest_pin_id: PinId
+    dest_pin_pos: Pos
+
+
+def source_dest_pin_pos_pairs(
+    netlist: Netlist,
+    placement: InstancePlacement,
+) -> Iterable[PinPosPair]:
+    """The pin@pos -> pin@pos pairs of a network + placement."""
+    for network_id, network in netlist.networks.items():
+        source_pin_points = placement_pin_seq_points(
+            netlist, network.input_pin_id_seq, placement
+        )
+
+        for dest_pin_id_seq in network.output_pin_id_seqs:
+            dest_pin_points = placement_pin_seq_points(
+                netlist, dest_pin_id_seq, placement
+            )
+
+            for (source_pin_id, source_pin_pos), (dest_pin_id, dest_pin_pos) in zip(
+                zip(network.input_pin_id_seq.slice, source_pin_points),
+                zip(dest_pin_id_seq.slice, dest_pin_points),
+            ):
+
+                yield PinPosPair(
+                    source_pin_id=(network.input_pin_id_seq.port_id, source_pin_id),
+                    source_pin_pos=source_pin_pos,
+                    dest_pin_id=(dest_pin_id_seq.port_id, dest_pin_id),
+                    dest_pin_pos=dest_pin_pos,
+                )
+
+
+def display_placement(netlist: Netlist, placement: InstancePlacement):
+    display_regions(list(placement_region(netlist, placement).subregions))
 
 
 MAX_PLACEMENT_ATTEMPTS = 40
