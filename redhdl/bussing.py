@@ -1,7 +1,8 @@
+from collections import Counter
 from dataclasses import dataclass
 from functools import reduce, wraps
 import operator
-from random import choice, shuffle
+from random import choice
 
 from frozendict import frozendict
 
@@ -20,7 +21,14 @@ from redhdl.placement import (
     source_dest_pin_pos_pairs,
 )
 from redhdl.positional_data import PositionalData
-from redhdl.region import PointRegion, Pos, Region, direction_unit_pos, xz_directions
+from redhdl.region import (
+    PointRegion,
+    Pos,
+    RectangularPrism,
+    Region,
+    direction_unit_pos,
+    xz_directions,
+)
 from redhdl.schematic import Block, Schematic
 
 
@@ -28,7 +36,7 @@ from redhdl.schematic import Block, Schematic
 class PathFindingProblem(PathSearchProblem[Pos, Pos]):
     start_point: Pos
     stop_point: Pos
-    blocked_regions: Region
+    blocked_points: frozenset[Pos]
 
     def initial_state(self) -> Pos:
         return self.start_point
@@ -39,7 +47,7 @@ class PathFindingProblem(PathSearchProblem[Pos, Pos]):
             for unit_pos in direction_unit_pos.values()
             if (
                 ((next_pos := unit_pos + state) == self.stop_point)
-                or (next_pos not in self.blocked_regions)
+                or (next_pos not in self.blocked_points)
             )
         ]
 
@@ -68,7 +76,7 @@ def bus_path(
     problem = PathFindingProblem(
         start_point=source_point,
         stop_point=dest_point,
-        blocked_regions=blocked_regions,
+        blocked_points=blocked_regions.region_points(),
     )
 
     try:
@@ -109,11 +117,15 @@ def wire_region(path: list[Pos]) -> Region:
     )
 
 
+BusPaths = dict[PinId, list[Pos]]
+PartialBusPaths = dict[PinId, list[Pos] | None]
+
+
 @first_id_cached
 def dest_pin_bus_path(
     netlist: Netlist,
     placement: InstancePlacement,
-) -> dict[PinId, list[Pos]]:
+) -> BusPaths:
     blocks_region = placement_region(netlist, placement).xz_padded(1)
 
     dest_pin_bus_path: dict[PinId, list[Pos]] = {}
@@ -129,7 +141,7 @@ def dest_pin_bus_path(
     return dest_pin_bus_path
 
 
-def bus_trace_pos_blocks(bus_paths: dict[PinId, list[Pos]]) -> PositionalData[Block]:
+def bus_trace_pos_blocks(bus_paths: BusPaths) -> PositionalData[Block]:
     return PositionalData(
         {
             bus_point: Block("minecraft:blue_wool", frozendict())
@@ -142,34 +154,63 @@ def bus_trace_pos_blocks(bus_paths: dict[PinId, list[Pos]]) -> PositionalData[Bl
 def bussed_placement_schematic(
     netlist: Netlist,
     placement: InstancePlacement,
-    bus_paths: dict[PinId, list[Pos]],
+    bus_paths: BusPaths,
 ) -> Schematic:
     schem = placement_schematic(netlist, placement)
     schem.pos_blocks |= bus_trace_pos_blocks(bus_paths)
     return schem
 
 
-def bussing_cost(bus_paths: dict[PinId, list[Pos]]) -> float:
-    return (
-        sum(len(bus_points) for bus_points in bus_paths.values()) / len(bus_paths) / 3
-    )
+def bussing_avg_length(bus_paths: PartialBusPaths) -> float:
+    successful_bus_path_lengths = [
+        len(bus_points) for bus_points in bus_paths.values() if bus_points is not None
+    ]
+    return sum(successful_bus_path_lengths) / len(successful_bus_path_lengths)
 
 
-def bussing_min_cost(netlist: Netlist, placement: InstancePlacement) -> float:
+def bussing_max_length(bus_paths: PartialBusPaths) -> float:
+    successful_bus_path_lengths = [
+        len(bus_points) for bus_points in bus_paths.values() if bus_points is not None
+    ]
+    return max(successful_bus_path_lengths)
+
+
+def bussing_min_avg_length(netlist: Netlist, placement: InstancePlacement) -> float:
     l1s = [
         (pin_pos_pair.dest_pin_pos - pin_pos_pair.source_pin_pos).l1()
         for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement)
     ]
-    return sum(l1s) / len(l1s) / 3
+    return sum(l1s) / len(l1s)
+
+
+def bussing_min_max_length(netlist: Netlist, placement: InstancePlacement) -> float:
+    l1s = [
+        (pin_pos_pair.dest_pin_pos - pin_pos_pair.source_pin_pos).l1()
+        for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement)
+    ]
+    return max(l1s)
+
+
+def interrupted_pin_line_of_sight_count(
+    netlist: Netlist, placement: InstancePlacement
+) -> float:
+    instance_regions = placement_region(netlist, placement)
+    return sum(
+        1
+        for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement)
+        if RectangularPrism(
+            pin_pos_pair.source_pin_pos, pin_pos_pair.dest_pin_pos
+        ).intersects(instance_regions)
+    )
 
 
 @dataclass
 class RelaxedPathFindingProblem(PathSearchProblem[Pos, Pos]):
     start_point: Pos
     stop_point: Pos
-    instance_regions: Region
-    wire_regions: Region
-    collision_cost: float = 5
+    instance_points: frozenset[Pos]
+    wire_points: frozenset[Pos]
+    collision_cost: float = 6
 
     def initial_state(self) -> Pos:
         return self.start_point
@@ -180,7 +221,7 @@ class RelaxedPathFindingProblem(PathSearchProblem[Pos, Pos]):
             for unit_pos in direction_unit_pos.values()
             if (
                 (next_pos := unit_pos + state) == self.stop_point
-                or next_pos not in self.instance_regions
+                or next_pos not in self.instance_points
             )
         ]
 
@@ -188,7 +229,7 @@ class RelaxedPathFindingProblem(PathSearchProblem[Pos, Pos]):
         return action
 
     def state_action_cost(self, state: Pos, action: Pos) -> float:
-        return 1 if (action not in self.wire_regions) else self.collision_cost
+        return 1 if (action not in self.wire_points) else self.collision_cost
 
     def is_goal_state(self, state: Pos) -> bool:
         return state == self.stop_point
@@ -207,53 +248,89 @@ def relaxed_bus_path(
     problem = RelaxedPathFindingProblem(
         start_point=source_point,
         stop_point=dest_point,
-        instance_regions=instance_regions,
-        wire_regions=wire_regions,
+        instance_points=instance_regions.region_points(),
+        wire_points=wire_regions.region_points(),
         collision_cost=collision_cost,
     )
 
     try:
-        return [source_point] + a_star_bfs_searched_solution(problem, max_steps=20_000)
+        return [source_point] + a_star_bfs_searched_solution(problem, max_steps=18_000)
     except SearchError as e:
         raise BussingError(str(e))
 
 
-BusPaths = dict[PinId, list[Pos]]
-
-
-def collision_count(bus_paths: BusPaths) -> int:
-    taken_points: set[Pos] = set()
+@first_id_cached
+def collision_count(bus_paths: PartialBusPaths) -> int:
+    taken_points = PointRegion(frozenset())
 
     collision_count = 0
     for path in bus_paths.values():
-        bus_points = set(path)
+        if path is None:
+            continue
+        bus_points = wire_region(path)
         collision_count += len(bus_points & taken_points)
         taken_points |= bus_points
 
     return collision_count
 
 
+@first_id_cached
+def too_far_to_bus_count(bus_paths: PartialBusPaths) -> int:
+    return sum(path is None for path in bus_paths.values())
+
+
+MAX_RECENT_FAILURES = 64
+_recent_dest_pin_bus_failures: list[PinId] = []
+
+
+def recent_dest_pin_bus_failure_count() -> dict[PinId, int]:
+    return Counter(_recent_dest_pin_bus_failures)
+
+
+def record_dest_pin_bus_failure(pin_id: PinId) -> None:
+    global _recent_dest_pin_bus_failures
+    _recent_dest_pin_bus_failures = _recent_dest_pin_bus_failures[
+        -(MAX_RECENT_FAILURES - 1) :
+    ] + [pin_id]
+
+
 def random_relaxed_bus_paths(
     instance_regions: Region,
     pin_pos_pairs: set[PinPosPair],
     collision_cost: float,
-) -> BusPaths:
+) -> PartialBusPaths:
     wire_regions: Region = PointRegion(frozenset())
 
-    ordered_pin_pos_pairs = sorted(pin_pos_pairs)
-    shuffle(ordered_pin_pos_pairs)
+    ordered_pin_pos_pairs = sorted(
+        pin_pos_pairs,
+        key=lambda pin_pos_pair: (
+            -recent_dest_pin_bus_failure_count()[pin_pos_pair.dest_pin_id],
+            pin_pos_pair,
+        ),
+    )
 
-    bus_path = {}
+    bus_path: PartialBusPaths = {
+        pin_pos_pair.dest_pin_id: None for pin_pos_pair in ordered_pin_pos_pairs
+    }
     for pin_pos_pair in ordered_pin_pos_pairs:
-        path = relaxed_bus_path(
-            instance_regions=instance_regions,
-            wire_regions=wire_regions,
-            source_point=pin_pos_pair.source_pin_pos,
-            dest_point=pin_pos_pair.dest_pin_pos,
-            collision_cost=collision_cost,
-        )
+        try:
+            path = relaxed_bus_path(
+                instance_regions=instance_regions,
+                wire_regions=wire_regions,
+                source_point=pin_pos_pair.source_pin_pos,
+                dest_point=pin_pos_pair.dest_pin_pos,
+                collision_cost=collision_cost,
+            )
+        except BussingError:
+            record_dest_pin_bus_failure(pin_pos_pair.dest_pin_id)
+            path = None
+            # raise
+            # No more paths will be attempted.
+            # break
+
         bus_path[pin_pos_pair.dest_pin_id] = path
-        wire_regions = wire_regions | wire_region(path)
+        if path is not None:
+            wire_regions = wire_regions | wire_region(path)
 
     return bus_path
 
@@ -261,9 +338,9 @@ def random_relaxed_bus_paths(
 def mutated_relaxed_bus_paths(
     instance_regions: Region,
     pin_pos_pairs: set[PinPosPair],
-    bus_paths: BusPaths,
+    bus_paths: PartialBusPaths,
     collision_cost: float,
-) -> BusPaths:
+) -> PartialBusPaths:
     pin_pos_pair_to_update = choice(sorted(pin_pos_pairs))
 
     wire_regions = reduce(
@@ -272,21 +349,27 @@ def mutated_relaxed_bus_paths(
             wire_region(path)
             for dest_pin_id, path in bus_paths.items()
             if dest_pin_id != pin_pos_pair_to_update.dest_pin_id
+            if path is not None
         ),
     )
 
-    new_path = relaxed_bus_path(
-        instance_regions=instance_regions,
-        wire_regions=wire_regions,
-        source_point=pin_pos_pair_to_update.source_pin_pos,
-        dest_point=pin_pos_pair_to_update.dest_pin_pos,
-        collision_cost=collision_cost,
-    )
+    try:
+        new_path = relaxed_bus_path(
+            instance_regions=instance_regions,
+            wire_regions=wire_regions,
+            source_point=pin_pos_pair_to_update.source_pin_pos,
+            dest_point=pin_pos_pair_to_update.dest_pin_pos,
+            collision_cost=collision_cost,
+        )
+    except BussingError:
+        # raise
+        new_path = None
+
     return {**bus_paths, pin_pos_pair_to_update.dest_pin_id: new_path}
 
 
 @dataclass
-class HerdPathFindingProblem(LocalSearchProblem[BusPaths]):
+class HerdPathFindingProblem(LocalSearchProblem[PartialBusPaths]):
     netlist: Netlist
     placement: InstancePlacement
     collision_cost: float = 3
@@ -301,14 +384,14 @@ class HerdPathFindingProblem(LocalSearchProblem[BusPaths]):
     def pin_pos_pairs(self) -> set[PinPosPair]:
         return set(source_dest_pin_pos_pairs(self.netlist, self.placement))
 
-    def random_solution(self) -> BusPaths:
+    def random_solution(self) -> PartialBusPaths:
         return random_relaxed_bus_paths(
             self.instance_regions,
             self.pin_pos_pairs,
             collision_cost=self.collision_cost,
         )
 
-    def mutated_solution(self, solution: BusPaths) -> BusPaths:
+    def mutated_solution(self, solution: PartialBusPaths) -> PartialBusPaths:
         return mutated_relaxed_bus_paths(
             self.instance_regions,
             self.pin_pos_pairs,
@@ -316,15 +399,18 @@ class HerdPathFindingProblem(LocalSearchProblem[BusPaths]):
             collision_cost=self.collision_cost,
         )
 
-    def solution_cost(self, solution: BusPaths) -> float:
-        return collision_count(solution) + 1
+    def solution_cost(self, solution: PartialBusPaths) -> float:
+        return collision_count(solution) + 1 + 8 * too_far_to_bus_count(solution)
+
+    def good_enough(self, solution: PartialBusPaths) -> bool:
+        return collision_count(solution) == 0
 
 
 @first_id_cached
 def dest_pin_relaxed_bus_path(
     netlist: Netlist,
     placement: InstancePlacement,
-) -> BusPaths:
+) -> PartialBusPaths:
 
     problem = HerdPathFindingProblem(
         netlist=netlist,
