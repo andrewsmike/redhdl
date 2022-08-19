@@ -2,92 +2,26 @@ from dataclasses import dataclass
 from functools import reduce, wraps
 import operator
 from random import choice, shuffle
-from typing import Iterable
 
 from frozendict import frozendict
 
-from redhdl.instances import RepeaterPort
 from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
-from redhdl.netlist import Netlist, PinId, PinIdSequence
+from redhdl.netlist import Netlist, PinId
 from redhdl.path_search import (
     PathSearchProblem,
     SearchError,
     a_star_bfs_searched_solution,
 )
-from redhdl.placement import InstancePlacement, placement_region, placement_schematic
-from redhdl.positional_data import PositionalData
-from redhdl.region import (
-    PointRegion,
-    Pos,
-    PositionSequence,
-    Region,
-    direction_unit_pos,
-    xz_directions,
+from redhdl.placement import (
+    InstancePlacement,
+    PinPosPair,
+    placement_region,
+    placement_schematic,
+    source_dest_pin_pos_pairs,
 )
+from redhdl.positional_data import PositionalData
+from redhdl.region import PointRegion, Pos, Region, direction_unit_pos, xz_directions
 from redhdl.schematic import Block, Schematic
-
-
-def placement_pin_seq_points(
-    netlist: Netlist,
-    pin_id_seq: PinIdSequence,
-    placement: InstancePlacement,
-) -> PositionSequence:
-    """The position sequence corresponding to the given PinIdSequence in a given placement."""
-    port = netlist.port(pin_id_seq.port_id)
-
-    if not isinstance(port, RepeaterPort):
-        raise ValueError(
-            "pin_id_seq_points() doesn't support anything but RepeaterPorts."
-        )
-
-    base_pin_points = (port.positions & pin_id_seq.slice) + Pos(0, 1, 0)
-
-    # Offset back/forward for inputs/outputs.
-    pin_points = {
-        "output": base_pin_points + direction_unit_pos[port.facing],
-        "input": base_pin_points - direction_unit_pos[port.facing],
-    }[port.port_type]
-
-    instance_id, _ = pin_id_seq.port_id
-    instance_pos, instance_dir = placement[instance_id]
-
-    return pin_points.y_rotated(xz_directions.index(instance_dir)) + instance_pos
-
-
-@dataclass(frozen=True, order=True)
-class PinPosPair:
-    source_pin_id: PinId
-    source_pin_pos: Pos
-    dest_pin_id: PinId
-    dest_pin_pos: Pos
-
-
-def source_dest_pin_pos_pairs(
-    netlist: Netlist,
-    placement: InstancePlacement,
-) -> Iterable[PinPosPair]:
-    """The pin@pos -> pin@pos pairs of a network + placement."""
-    for network_id, network in netlist.networks.items():
-        source_pin_points = placement_pin_seq_points(
-            netlist, network.input_pin_id_seq, placement
-        )
-
-        for dest_pin_id_seq in network.output_pin_id_seqs:
-            dest_pin_points = placement_pin_seq_points(
-                netlist, dest_pin_id_seq, placement
-            )
-
-            for (source_pin_id, source_pin_pos), (dest_pin_id, dest_pin_pos) in zip(
-                zip(network.input_pin_id_seq.slice, source_pin_points),
-                zip(dest_pin_id_seq.slice, dest_pin_points),
-            ):
-
-                yield PinPosPair(
-                    source_pin_id=(network.input_pin_id_seq.port_id, source_pin_id),
-                    source_pin_pos=source_pin_pos,
-                    dest_pin_id=(dest_pin_id_seq.port_id, dest_pin_id),
-                    dest_pin_pos=dest_pin_pos,
-                )
 
 
 @dataclass
