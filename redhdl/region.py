@@ -62,7 +62,16 @@ from dataclasses import dataclass
 from functools import cache, cached_property
 from pprint import pformat
 from random import randint
-from typing import Any, Iterator, Literal, NamedTuple, TypeGuard, cast
+from typing import (
+    Any,
+    Iterator,
+    Literal,
+    NamedTuple,
+    TypeGuard,
+    TypeVar,
+    cast,
+    overload,
+)
 
 from redhdl.slice import Slice
 
@@ -777,3 +786,201 @@ def any_overlap(regions: list[Region]) -> bool:
         for left_index, left in enumerate(regions)
         for right in regions[left_index + 1 :]
     )
+
+
+def point_ranges(points: set[int], min_gap_size: int = 3) -> list[tuple[int, int]]:
+    """
+    The minimal set of ranges completely covering a set of points, with gap sizes
+    of at least min_gap_size.
+
+    >>> point_ranges({8, 10, 11, 15, 16, 19, 20}, min_gap_size=1)
+    [(8, 8), (10, 11), (15, 16), (19, 20)]
+
+    >>> point_ranges({8, 10, 11, 15, 16, 19, 20}, min_gap_size=3)
+    [(8, 11), (15, 20)]
+
+    >>> point_ranges({8, 10, 11, 15, 16, 19, 20}, min_gap_size=4)
+    [(8, 20)]
+    """
+    lower_bound, upper_bound = min(points), max(points)
+
+    ranges: list[tuple[int, int]] = []
+
+    # Track the current distance to the last block (moving towards higher
+    # numbers) in gap_count and the current range's lower bound (reset to None
+    # once we get min_gap_size away from the current ranges and we carve it
+    # out).
+    gap_count = 0
+    current_lower_bound: int | None = None
+    for i in range(lower_bound, upper_bound + 1):
+        if i in points:
+            # current_lower_bound is None: New range!
+            # current_lower_bound is not None: Continue range, reset gap count
+            gap_count = 0
+            if current_lower_bound is None:
+                current_lower_bound = i
+        else:
+            # current_lower_bound is None: Not in a range, continue onwards.
+            # current_lower_bound is not None: In a range, end range and reset iff
+            # gap_count is >= min_gap_size.
+            gap_count += 1
+            if gap_count == min_gap_size:
+                assert current_lower_bound is not None  # For MyPy.
+                ranges.append((current_lower_bound, i - min_gap_size))
+                current_lower_bound = None
+
+    if current_lower_bound is not None:
+        return ranges + [(current_lower_bound, i)]
+    else:
+        return ranges
+
+
+AxisData = TypeVar("AxisData")
+
+
+@overload
+def partial_coord(
+    values: tuple[AxisData, AxisData], axis_index: int
+) -> tuple[AxisData]:
+    ...
+
+
+@overload
+def partial_coord(
+    values: tuple[AxisData, AxisData, AxisData], axis_index: int
+) -> tuple[AxisData, AxisData]:
+    ...
+
+
+def partial_coord(values, axis_index):
+    if len(values) == 3:
+        x, y, z = values
+        return [
+            (z, y),  # Prefer that 'Y' stay vertical when possible.
+            (x, z),
+            (x, y),
+        ][axis_index]
+    else:
+        x, y = values
+        return [
+            (y,),
+            (x,),
+        ][axis_index]
+
+
+def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
+    """
+    "Compactly" display a list of regions in ASCII using an axis-aligned
+    orthographic projection, removing empty space.
+
+    >>> display_regions_orthographic(  # doctest: +NORMALIZE_WHITESPACE
+    ...     regions=[
+    ...         RectangularPrism(Pos(0, 0, 0), Pos(4, 8, 4)),
+    ...         RectangularPrism(Pos(6, -1, 6), Pos(10, 4, 10)),
+    ...         RectangularPrism(Pos(20, 15, 20), Pos(28, 20, 28)),
+    ...     ],
+    ...     axis=0,
+    ... )
+    Y
+                 .
+                 . 333333333
+                 . 333333333
+                 . 333333333
+                 . 333333333
+                 . 333333333
+                 . 333333333
+                 .
+    .........................
+                 .
+     11111       .
+     11111       .
+     11111       .
+     11111       .
+     11111 22222 .
+     11111 22222 .
+     11111 22222 .
+     11111 22222 .
+     11111 22222 .
+           22222 .
+                 .           Z
+    """
+    axis_names = partial_coord(("X", "Y", "Z"), axis)
+
+    assert len(regions) < 10
+    region_symbol = dict(zip(regions, "1234567890"))
+    region_all_points = {
+        region: {partial_coord(pos, axis) for pos in region} for region in regions
+    }
+    all_points = set.union(*region_all_points.values())
+
+    # Handle overlaps gracefully: If point is already assigned a different
+    # region's symbol, assign it to '*'.
+    point_symbol = {}
+    for region, region_points in region_all_points.items():
+        for point in region_points:
+            if point in point_symbol:
+                point_symbol[point] = "*"
+            else:
+                point_symbol[point] = region_symbol[region]
+
+    x_filled_ranges = point_ranges({partial_coord(point, 1)[0] for point in all_points})
+    y_filled_ranges = point_ranges({partial_coord(point, 0)[0] for point in all_points})
+
+    total_height = (
+        sum(ymax - ymin + 1 + 2 for ymin, ymax in y_filled_ranges)
+        + len(y_filled_ranges)
+        - 1
+    )
+    total_width = (
+        sum(xmax - xmin + 1 + 2 for xmin, xmax in x_filled_ranges)
+        + len(x_filled_ranges)
+        - 1
+    )
+
+    spacing_line = ""
+    for index, (xmin, xmax) in enumerate(x_filled_ranges):
+        if index > 0:
+            spacing_line += "."
+        spacing_line += " " + " " * (xmax - xmin + 1) + " "
+
+    # Reversed order.
+    result_lines = []
+
+    xmin, xmax = x_filled_ranges[0][0], x_filled_ranges[-1][1]
+    ymin, ymax = y_filled_ranges[0][0], y_filled_ranges[-1][1]
+    for y_index, (range_y_min, range_y_max) in enumerate(y_filled_ranges):
+        if y_index > 0:
+            result_lines.append("." * total_width)
+
+        if y_index == 0:
+            result_lines.append(spacing_line + axis_names[0])
+        else:
+            result_lines.append(spacing_line)
+
+        for y in range(range_y_min, range_y_max + 1):
+            line = ""
+            for x_index, (range_x_min, range_x_max) in enumerate(x_filled_ranges):
+                if x_index > 0:
+                    line += "."
+                content = "".join(
+                    [
+                        point_symbol.get((x, y), " ")
+                        for x in range(range_x_min, range_x_max + 1)
+                    ]
+                )
+                line += " " + content + " "
+
+            result_lines.append(line)
+
+        result_lines.append(spacing_line)
+
+    result_lines.append(axis_names[1])
+
+    for line in reversed(result_lines):
+        print(line)
+
+
+def display_regions(regions: list[Region]) -> None:
+    for perspective_axis in (X_AXIS, Y_AXIS, Z_AXIS):
+        display_regions_orthographic(regions, perspective_axis)
+        print()
