@@ -81,6 +81,10 @@ Axis = Literal[0, 1, 2]
 X_AXIS, Y_AXIS, Z_AXIS = axes = cast(list[Axis], [0, 1, 2])
 
 
+def is_axis(axis: int) -> TypeGuard[Axis]:
+    return axis in axes
+
+
 Direction = Literal["up", "down", "north", "east", "south", "west"]
 
 
@@ -465,13 +469,11 @@ class Region(metaclass=ABCMeta):
     def region_points(self) -> frozenset[Pos]:
         return frozenset(self)
 
-    @abstractmethod
     def __contains__(self, point: Pos) -> bool:
-        pass
+        return point in iter(self)
 
-    @abstractmethod
     def is_empty(self) -> bool:
-        pass
+        return len(self) == 0
 
     def intersects(self, other: "Region") -> bool:
         return not (self & other).is_empty()
