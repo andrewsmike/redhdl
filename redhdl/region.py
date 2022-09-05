@@ -81,7 +81,6 @@ Axis = Literal[0, 1, 2]
 X_AXIS, Y_AXIS, Z_AXIS = axes = cast(list[Axis], [0, 1, 2])
 
 
-# Direction: Axis, is_positive
 Direction = Literal["up", "down", "north", "east", "south", "west"]
 
 
