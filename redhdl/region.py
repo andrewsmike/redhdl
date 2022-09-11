@@ -75,13 +75,15 @@ from typing import (
 
 from redhdl.slice import Slice
 
-Axis = Literal[0, 1, 2]
+Axis = Literal["x", "y", "z"]
+
+axes = cast(list[Axis], ["x", "y", "z"])
 
 
-X_AXIS, Y_AXIS, Z_AXIS = axes = cast(list[Axis], [0, 1, 2])
+X_AXIS_INDEX, Y_AXIS_INDEX, Z_AXIS_INDEX = 0, 1, 2
 
 
-def is_axis(axis: int) -> TypeGuard[Axis]:
+def is_axis(axis: str) -> TypeGuard[Axis]:
     return axis in axes
 
 
@@ -104,12 +106,12 @@ xz_directions = [
 ]
 
 direction_by_axis_ispos: dict[tuple[Axis, bool], Direction] = {
-    (0, True): "east",
-    (2, True): "south",
-    (0, False): "west",
-    (2, False): "north",
-    (1, True): "up",
-    (1, False): "down",
+    ("x", True): "east",
+    ("z", True): "south",
+    ("x", False): "west",
+    ("z", False): "north",
+    ("y", True): "up",
+    ("y", False): "down",
 }
 
 direction_axis_ispos = {
@@ -117,7 +119,7 @@ direction_axis_ispos = {
 }
 
 
-opposite_direction: dict[str, Direction] = {
+opposite_direction: dict[Direction, Direction] = {
     "north": "south",
     "south": "north",
     "up": "down",
@@ -271,7 +273,7 @@ class Pos(NamedTuple):
         )
 
     def is_zero(self) -> bool:
-        return self == Pos(0, 0, 0)
+        return self == zero_pos
 
     def l1(self) -> int:
         return sum(abs(self))
@@ -293,6 +295,9 @@ class Pos(NamedTuple):
 
     def __repr__(self: "Pos") -> str:
         return str(self)
+
+
+zero_pos = Pos(0, 0, 0)
 
 
 direction_unit_pos = {
@@ -880,7 +885,7 @@ def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
     ...         RectangularPrism(Pos(6, -1, 6), Pos(10, 4, 10)),
     ...         RectangularPrism(Pos(20, 15, 20), Pos(28, 20, 28)),
     ...     ],
-    ...     axis=0,
+    ...     axis="x",
     ... )
     Y
                  .
@@ -905,12 +910,13 @@ def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
            22222 .
                  .           Z
     """
-    axis_names = partial_coord(("X", "Y", "Z"), axis)
+    axis_names = partial_coord(("X", "Y", "Z"), axes.index(axis))
 
     assert len(regions) < 10
     region_symbol = dict(zip(regions, "1234567890"))
     region_all_points = {
-        region: {partial_coord(pos, axis) for pos in region} for region in regions
+        region: {partial_coord(pos, axes.index(axis)) for pos in region}
+        for region in regions
     }
     all_points = set.union(*region_all_points.values())
 
@@ -982,6 +988,6 @@ def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
 
 
 def display_regions(regions: list[Region]) -> None:
-    for perspective_axis in (X_AXIS, Y_AXIS, Z_AXIS):
-        display_regions_orthographic(regions, perspective_axis)
+    for perspective_axis in ("x", "y", "z"):
+        display_regions_orthographic(regions, cast(Axis, perspective_axis))
         print()

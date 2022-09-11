@@ -43,9 +43,9 @@ from nbtlib.tag import ByteArray, Compound, Int, Short
 
 from redhdl.positional_data import PositionalData, PositionMask
 from redhdl.region import (
-    X_AXIS,
-    Y_AXIS,
-    Z_AXIS,
+    X_AXIS_INDEX,
+    Y_AXIS_INDEX,
+    Z_AXIS_INDEX,
     Direction,
     Pos,
     RectangularPrism,
@@ -248,9 +248,9 @@ def save_schem(schematic: Schematic, dest_path: str):
     }
 
     encoded_pos_blocks = bytearray()
-    for y in range(max_pos[Y_AXIS] + 1):
-        for z in range(max_pos[Z_AXIS] + 1):
-            for x in range(max_pos[X_AXIS] + 1):
+    for y in range(max_pos[Y_AXIS_INDEX] + 1):
+        for z in range(max_pos[Z_AXIS_INDEX] + 1):
+            for x in range(max_pos[X_AXIS_INDEX] + 1):
                 encoded_pos_blocks.append(
                     block_type_palette_index[blocks.get(Pos(x, y, z), air_block)]
                 )
@@ -266,14 +266,14 @@ def save_schem(schematic: Schematic, dest_path: str):
                 "DataVersion": Int(2584),
                 "Metadata": Compound(
                     {
-                        "WEOffsetX": Int(we_pos[X_AXIS]),
-                        "WEOffsetY": Int(we_pos[Y_AXIS]),
-                        "WEOffsetZ": Int(we_pos[Z_AXIS]),
+                        "WEOffsetX": Int(we_pos[X_AXIS_INDEX]),
+                        "WEOffsetY": Int(we_pos[Y_AXIS_INDEX]),
+                        "WEOffsetZ": Int(we_pos[Z_AXIS_INDEX]),
                     }
                 ),
-                "Height": Short(max_pos[Y_AXIS] + 1),
-                "Length": Short(max_pos[Z_AXIS] + 1),
-                "Width": Short(max_pos[X_AXIS] + 1),
+                "Height": Short(max_pos[Y_AXIS_INDEX] + 1),
+                "Length": Short(max_pos[Z_AXIS_INDEX] + 1),
+                "Width": Short(max_pos[X_AXIS_INDEX] + 1),
                 "PaletteMax": Int(len(block_type_palette_index)),
                 "Palette": Compound(block_palette),
                 "BlockData": ByteArray(encoded_pos_blocks),
