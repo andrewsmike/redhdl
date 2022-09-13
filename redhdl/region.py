@@ -98,7 +98,7 @@ def is_direction(value: str) -> TypeGuard[Direction]:
 
 
 # Ordered by right-hand-rule rotations on the y axis.
-xz_directions = [
+xz_directions: list[Direction] = [
     "north",
     "east",
     "south",
