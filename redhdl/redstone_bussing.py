@@ -15,28 +15,26 @@ TODO:
 
 
 Examples:
->>> bussing = redstone_bussing(
+bussing = redstone_bussing(
 ...     start_pos=Pos(0, 0, 0),
-...     stop_pos=Pos(3, 2, 2),
+...     stop_pos=Pos(3, 8, 3),
 ...     instance_points=set(),
 ...     other_busses=RedstoneBussing(),
-...     max_steps=10000,
+...     max_steps=300,
 ... )
 
->>> from pprint import pprint
->>> pprint(bussing)
+from pprint import pprint
+pprint(bussing)
 RedstoneBussing(element_sig_strengths=frozendict.frozendict({Pos(0, 0, 0): 15, ..., Pos(3, 2, 2): 10}),
                 repeater_directions=frozendict.frozendict({}),
                 spacer_blocks=frozenset(),
-                airspace_blocks=frozenset({Pos(0, 0, 1),
-                                           Pos(1, 2, 2),
-                                           Pos(1, 1, 1)}))
->>> pprint(bussing.schem())
-Schematic(pos_blocks={Pos(0, -2, 1): Block(block_type='minecraft:gray_wool',
+                airspace_blocks=frozenset({Pos(3, 2, 1), Pos(3, 1, 0)}))
+
+This test is overspecific. Replace with specific demonstrations of existing blocks:
+pprint(bussing.schem())
+Schematic(pos_blocks={Pos(0, -1, 0): Block(block_type='minecraft:gray_wool',
                                            attributes=frozendict.frozendict({})),
                       ...,
-                      Pos(3, 1, 2): Block(block_type='minecraft:gray_wool',
-                                          attributes=frozendict.frozendict({})),
                       Pos(3, 2, 2): Block(block_type='minecraft:redstone_wire',
                                           attributes=frozendict.frozendict({}))},
           pos_sign_lines={})
@@ -524,7 +522,7 @@ class RedstoneBussing:
 
 @dataclass
 class RedstonePathFindingProblem(
-    PathSearchProblem[tuple[Pos, RedstoneBussing | None], RedstonePathStep]
+    PathSearchProblem[tuple[Pos, Pos, RedstoneBussing | None], RedstonePathStep]
 ):
     """
     Initial context:
@@ -557,7 +555,6 @@ class RedstonePathFindingProblem(
     ...     stop_pos=Pos(3, 3, 0),
     ...     instance_points=set(),
     ...     other_busses=RedstoneBussing(),
-    ...     repeater_cost=6,
     ... )
 
     >>> from pprint import pprint
@@ -567,9 +564,9 @@ class RedstonePathFindingProblem(
      RedstonePathStep(next_pos=Pos(2, 2, 0), is_repeater=False, facing=None),
      RedstonePathStep(next_pos=Pos(3, 3, 0), is_repeater=False, facing=None)]
 
-    >>> pos, bussing = problem.initial_state()
+    >>> pos, prev_pos, bussing = problem.initial_state()
     >>> for step in steps:
-    ...     pos, bussing = problem.state_action_result((pos, bussing), step)
+    ...     pos, prev_pos, bussing = problem.state_action_result((pos, prev_pos, bussing), step)
 
     >>> pprint(bussing)
     RedstoneBussing(element_sig_strengths=frozendict.frozendict({Pos(0, 0, 0): 15, ..., Pos(3, 3, 0): 12}),
@@ -594,18 +591,20 @@ class RedstonePathFindingProblem(
     instance_points: set[Pos]
     other_busses: "RedstoneBussing"
 
-    repeater_cost: int
+    repeater_cost: int = 5
+    change_direction_cost: int = 2
 
-    def initial_state(self) -> tuple[Pos, Optional["RedstoneBussing"]]:
+    def initial_state(self) -> tuple[Pos, Pos, Optional["RedstoneBussing"]]:
         return (
+            self.start_pos,
             self.start_pos,
             RedstoneBussing(element_sig_strengths=frozendict({self.start_pos: 15})),
         )
 
     def state_actions(
-        self, state: tuple[Pos, Optional["RedstoneBussing"]]
+        self, state: tuple[Pos, Pos, Optional["RedstoneBussing"]]
     ) -> list[RedstonePathStep]:
-        current_pos, bussing = state
+        current_pos, prev_pos, bussing = state
         # When step is invalid, we're at a dead end.
         if bussing is None:
             return []
@@ -622,15 +621,16 @@ class RedstonePathFindingProblem(
 
     def state_action_result(
         self,
-        state: tuple[Pos, Optional[RedstoneBussing]],
+        state: tuple[Pos, Pos, Optional[RedstoneBussing]],
         action: RedstonePathStep,
     ) -> tuple[Pos, Optional[RedstoneBussing]]:
-        current_pos, bussing = state
+        current_pos, prev_pos, bussing = state
         if bussing is None:
             return current_pos, None
         else:
             return (
                 action.next_pos,
+                current_pos,
                 bussing.add_step(
                     self.other_busses,
                     prev_pos=current_pos,
@@ -639,26 +639,37 @@ class RedstonePathFindingProblem(
             )
 
     def state_action_cost(
-        self, state: tuple[Pos, Optional[RedstoneBussing]], action: RedstonePathStep
+        self,
+        state: tuple[Pos, Pos, Optional[RedstoneBussing]],
+        action: RedstonePathStep,
     ) -> float:
-        current_pos, bussing = state
+        current_pos, prev_pos, bussing = state
+
         if bussing is None:
             return 0
-        elif current_pos in bussing.repeater_directions:
-            return self.repeater_cost
-        else:
-            return 1
 
-    def is_goal_state(self, state: tuple[Pos, Optional[RedstoneBussing]]) -> bool:
-        current_pos, bussing = state
+        if (current_pos - prev_pos) != (action.next_pos - current_pos):
+            change_direction_cost = self.change_direction_cost
+        else:
+            change_direction_cost = 0
+
+        if current_pos in bussing.repeater_directions:
+            repeater_cost = self.repeater_cost
+        else:
+            repeater_cost = 0
+
+        return 10 + repeater_cost + change_direction_cost
+
+    def is_goal_state(self, state: tuple[Pos, Pos, Optional[RedstoneBussing]]) -> bool:
+        current_pos, prev_pos, bussing = state
         return (
             bussing is not None
             and current_pos == self.stop_pos
             and bussing.repeater_directions.get(current_pos) is None
         )
 
-    def min_distance(self, state: tuple[Pos, Optional[RedstoneBussing]]) -> float:
-        current_pos, bussing = state
+    def min_distance(self, state: tuple[Pos, Pos, Optional[RedstoneBussing]]) -> float:
+        current_pos, prev_pos, bussing = state
         distance_vector = current_pos - self.stop_pos
 
         y_distance = distance_vector.y
@@ -667,7 +678,7 @@ class RedstonePathFindingProblem(
         # How many redstone steps are necessary to get there?
         min_steps = max(xz_distance, y_distance)
 
-        return (self.repeater_cost * min_steps // 16) + min_steps
+        return (self.repeater_cost * min_steps // 16) + min_steps * 10
 
 
 def redstone_bussing(
@@ -682,14 +693,15 @@ def redstone_bussing(
         stop_pos=stop_pos,
         instance_points=set(),
         other_busses=RedstoneBussing(),
-        repeater_cost=6,
     )
 
     steps = a_star_bfs_searched_solution(problem, max_steps=max_steps)
 
-    pos, bussing = problem.initial_state()
+    pos, prev_pos, bussing = problem.initial_state()
     for step in steps:
-        pos, bussing = problem.state_action_result((pos, bussing), step)
+        pos, prev_pos, bussing = problem.state_action_result(
+            (pos, prev_pos, bussing), step
+        )
 
     assert bussing is not None  # For MyPy.
 

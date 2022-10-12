@@ -14,10 +14,10 @@ from antlr4.tree.Tree import ParseTree
 from antlr4.tree.Trees import Trees
 from graphviz import Digraph
 
-from redhdl.parser.vhdlLexer import vhdlLexer
-from redhdl.parser.vhdlListener import vhdlListener  # noqa
-from redhdl.parser.vhdlParser import vhdlParser
-from redhdl.parser.vhdlVisitor import vhdlVisitor  # noqa
+from redhdl.vhdl.vhdlLexer import vhdlLexer
+from redhdl.vhdl.vhdlListener import vhdlListener  # noqa
+from redhdl.vhdl.vhdlParser import vhdlParser
+from redhdl.vhdl.vhdlVisitor import vhdlVisitor  # noqa
 
 
 class AbortSyntaxErrorListener(ErrorListener):

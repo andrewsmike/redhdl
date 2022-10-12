@@ -198,11 +198,22 @@ def a_star_bfs_searched_solution(
 
     explored_states: set[State] = {first_step.state}
 
+    last_reported_min_cost = 0
+    last_reported_cost = 0
+
     remaining_steps: int = max_steps
     while len(next_best_action_heap) > 0 and remaining_steps > 0:
         step = heappop(next_best_action_heap)
         if problem.is_goal_state(step.state):
             return step.action_sequence()
+
+        if step.min_cost > last_reported_min_cost:
+            last_reported_min_cost = step.min_cost
+            print(f"Working on min_cost={last_reported_min_cost}")
+
+        if step.cost > last_reported_cost:
+            last_reported_cost = step.cost
+            print(f"Working on cost={last_reported_cost}")
 
         explored_states.add(step.state)
 

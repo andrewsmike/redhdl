@@ -14,11 +14,11 @@ known_first_party = [
 
 skip = [
     "redhdl/ascii_dag.py",
-    "redhdl/parser/autogen",
-    "redhdl/parser/vhdlLexer.py",
-    "redhdl/parser/vhdlParser.py",
-    "redhdl/parser/vhdlParserVisitor.py",
-    "redhdl/parser/vhdlParserListener.py",
+    "redhdl/vhdl/autogen",
+    "redhdl/vhdl/vhdlLexer.py",
+    "redhdl/vhdl/vhdlParser.py",
+    "redhdl/vhdl/vhdlParserVisitor.py",
+    "redhdl/vhdl/vhdlParserListener.py",
 ]
 
 [tool.mypy]
@@ -27,7 +27,7 @@ ignore_missing_imports = true
 exclude = "ascii_dag.py|vhdl(Lexer|Parser|Listener|ParserVisitor|Visitor|ParserListener).py"
 
 [tool.pytest.ini_options]
-addopts = "--doctest-modules --ignore=redhdl/parser/autogen --ignore=redhdl/parser/vhdlLexer.py --ignore=redhdl/parser/vhdlParser.py --ignore=redhdl/parser/vhdlParserVisitor.py"
+addopts = "--doctest-modules --ignore=redhdl/vhdl/autogen --ignore=redhdl/vhdl/vhdlLexer.py --ignore=redhdl/vhdl/vhdlParser.py --ignore=redhdl/vhdl/vhdlParserVisitor.py"
 doctest_optionflags = "ELLIPSIS"
 filterwarnings = "ignore::DeprecationWarning"
 

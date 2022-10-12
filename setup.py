@@ -18,7 +18,7 @@ class RegenerateParserCommand(Command):
 
     def run(self):
         chdir(dirname(__file__))
-        chdir("redhdl/parser")
+        chdir("redhdl/vhdl")
         antlr_command_parts = [
             "antlr4",
             "-Dlanguage=Python3",
@@ -34,7 +34,7 @@ class RegenerateParserCommand(Command):
         print("Running `" + " ".join(antlr_command_parts) + "`.")
         run(antlr_command_parts)
 
-        chdir("../parser")
+        chdir("../vhdl")
         run(["cp"] + glob("autogen/*.py") + ["."])
 
 
