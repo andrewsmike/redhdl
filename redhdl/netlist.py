@@ -3,8 +3,7 @@ Represent netlists, or circuits made of instances, with ports, that are collecti
 pins and the networks (connections between them).
 
 These are abstract / logical netlists: They don't represent schematic blocks, regions,
-placements, or bussing. This information is stored in separate datastructures that may
-reference abstract netlists, or may be attached as part of the InstanceContext generic.
+placements, or bussing. Instances should be subclassed to provide this extra context.
 
 >>> from pprint import pprint
 
@@ -34,7 +33,9 @@ Netlist(instances={'adder': ExampleInstanceType(...),
         networks={0: Network(input_pin_id_seq=PinIdSequence(port_id=('constant_a', 'output'), slice=Slice(0, 4, 1)),
                              output_pin_id_seqs={PinIdSequence(port_id=('adder', 'a'), slice=Slice(0, 4, 1))}),
                   1: Network(input_pin_id_seq=PinIdSequence(port_id=('constant_b', 'output'), slice=Slice(0, 4, 1)),
-                             output_pin_id_seqs={PinIdSequence(port_id=('adder', 'b'), slice=Slice(0, 4, 1))})})
+                             output_pin_id_seqs={PinIdSequence(port_id=('adder', 'b'), slice=Slice(0, 4, 1))}),
+                  2: Network(input_pin_id_seq=PinIdSequence(port_id=('adder', 'output'), slice=Slice(0, 4, 1)),
+                             output_pin_id_seqs={PinIdSequence(port_id=('output', 'out'), slice=Slice(0, 4, 1))})})
 
 >>> example_netlist.display_ascii()  # doctest: +NORMALIZE_WHITESPACE
 +------------+         +------------+
@@ -46,6 +47,12 @@ Netlist(instances={'adder': ExampleInstanceType(...),
               +-------+
               | adder |
               +-------+
+                  *
+                  *
+                  *
+              +--------+
+              | output |
+              +--------+
 """
 
 from copy import deepcopy
@@ -214,14 +221,18 @@ class Netlist:
         pin, rest must be inputs (to Instances).
 
     This semantic graph is not nicely represented by a plain-old-data DAG in its own right.
-    Instead of allowing potentially-deduplicated diamond-shaped references (which may be more
-    compute-efficient, but more complicated), this is a minimal, moderately encoded format
-    (which is more storage-efficient, might not be less compute efficient, and is much less
-    stateful.)
+    Instead of allowing potentially-deduplicated diamond-shaped data structures (which may
+    be more compute-efficient, but more complicated), this is a minimal, moderately encoded
+    format (which is more storage-efficient, might not be less compute efficient, and is much
+    less stateful).
 
     Instances breaks out into details such as type, port-pincounts, and more.
     Ports and pins are identified by (<instance_id>, <port_index>) and (<port_id>, <pin_index>)
     respectively.
+
+    Netlists may be partial / have inputs and outputs.
+    The special instances "input" and "output" have corresponding ports describing
+    the I/O ports of the entire netlist.
 
     The top level netlist represents instances and available networks.
     Here we use dictionaries from ID -> <object> to avoid tricky vector-packing logic and
@@ -246,13 +257,14 @@ class Netlist:
          (('adder', 'a'), 3): frozenset({0}),
          (('adder', 'b'), 0): frozenset({1}),
          ...
-         (('adder', 'b'), 3): frozenset({1}),
-         (('constant_a', 'output'), 0): frozenset({0}),
          ...
          (('constant_a', 'output'), 3): frozenset({0}),
          (('constant_b', 'output'), 0): frozenset({1}),
          ...
-         (('constant_b', 'output'), 3): frozenset({1})}
+         (('constant_b', 'output'), 3): frozenset({1}),
+         (('output', 'out'), 0): frozenset({2}),
+         ...
+         (('output', 'out'), 3): frozenset({2})}
         """
         pin_id_network_id_pairs = sorted(
             (pin_id, network_id)
@@ -400,6 +412,7 @@ example_netlist: Netlist = Netlist(
         "constant_a": deepcopy(example_constant_instance),
         "constant_b": deepcopy(example_constant_instance),
         "adder": deepcopy(example_adder_instance),
+        "output": Instance({"out": Port("out", 4)}),
     },
     networks={
         0: Network(
@@ -409,6 +422,10 @@ example_netlist: Netlist = Netlist(
         1: Network(
             input_pin_id_seq=PinIdSequence(("constant_b", "output"), Slice(4)),
             output_pin_id_seqs={PinIdSequence(("adder", "b"), Slice(4))},
+        ),
+        2: Network(
+            input_pin_id_seq=PinIdSequence(("adder", "output"), Slice(4)),
+            output_pin_id_seqs={PinIdSequence(("output", "out"), Slice(4))},
         ),
     },
 )

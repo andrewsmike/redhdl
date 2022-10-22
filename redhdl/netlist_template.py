@@ -12,18 +12,26 @@ Netlist(instances={'and': SchematicInstance(...),
                              output_pin_id_seqs={PinIdSequence(port_id=('and',
                                                                         'a'),
                                                                slice=Slice(0, 8, 1))}),
-                  ...
-                  2: Network(input_pin_id_seq=PinIdSequence(port_id=('and',
+                  ...: Network(input_pin_id_seq=PinIdSequence(port_id=('and',
                                                                      'out'),
                                                             slice=Slice(0, 8, 1)),
-                             output_pin_id_seqs={PinIdSequence(port_id=('not_out',
-                                                                        'in'),
-                                                               slice=Slice(0, 8, 1))})})
+                             output_pin_id_seqs={PinIdSequence(port_id=('output',
+                                                                        'out'),
+                                                               slice=Slice(0, 8, 1))}),
+                  ...})
 """
 from typing import cast
 
 from redhdl.instance_template import schematic_instance_from_schem
-from redhdl.netlist import Instance, InstanceId, Netlist, Network, PinIdSequence, PortId
+from redhdl.netlist import (
+    Instance,
+    InstanceId,
+    Netlist,
+    Network,
+    PinIdSequence,
+    Port,
+    PortId,
+)
 from redhdl.schematic import load_schem
 from redhdl.slice import Slice
 
@@ -42,18 +50,37 @@ example_network_specs: NetworkSpecs = {
     (("not_a", "out"), Slice(8)): {(("and", "a"), Slice(8))},
     (("not_b", "out"), Slice(8)): {(("and", "b"), Slice(8))},
     (("and", "out"), Slice(8)): {(("not_out", "in"), Slice(8))},
+    (("input", "a"), Slice(8)): {(("not_a", "in"), Slice(8))},
+    (("input", "b"), Slice(8)): {(("not_b", "in"), Slice(8))},
+    (("and", "out"), Slice(8)): {(("output", "out"), Slice(8))},
 }
 
 
 def netlist_from_simple_spec(
     instance_config: dict[InstanceId, InstanceConfig],
     network_specs: NetworkSpecs,
+    input_port_bitwidths: dict[str, int] | None = None,
+    output_port_bitwidths: dict[str, int] | None = None,
 ) -> Netlist:
     instances = {
         name: schematic_instance_from_schem(
             load_schem(f"schematic_examples/hdl_{config['schem_name']}.schem")
         )
         for name, config in instance_config.items()
+    }
+    io_instances = {
+        "input": Instance(
+            {
+                name: Port("out", bitwidth)
+                for name, bitwidth in (input_port_bitwidths or {}).items()
+            }
+        ),
+        "output": Instance(
+            {
+                name: Port("in", bitwidth)
+                for name, bitwidth in (output_port_bitwidths or {}).items()
+            }
+        ),
     }
     networks = {
         i: Network(
@@ -63,4 +90,4 @@ def netlist_from_simple_spec(
         for i, (driver_seq, dest_seqs) in enumerate(network_specs.items())
     }
 
-    return Netlist(cast(dict[str, Instance], instances), networks)
+    return Netlist(cast(dict[str, Instance], instances | io_instances), networks)
