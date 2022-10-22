@@ -14,10 +14,10 @@ from antlr4.tree.Tree import ParseTree
 from antlr4.tree.Trees import Trees
 from graphviz import Digraph
 
-from redhdl.parser.vhdlLexer import vhdlLexer
-from redhdl.parser.vhdlListener import vhdlListener  # noqa
-from redhdl.parser.vhdlParser import vhdlParser
-from redhdl.parser.vhdlVisitor import vhdlVisitor  # noqa
+from redhdl.vhdl.vhdlLexer import vhdlLexer
+from redhdl.vhdl.vhdlListener import vhdlListener  # noqa
+from redhdl.vhdl.vhdlParser import vhdlParser
+from redhdl.vhdl.vhdlVisitor import vhdlVisitor  # noqa
 
 
 class AbortSyntaxErrorListener(ErrorListener):
@@ -225,7 +225,7 @@ def display_parse_tree(tree: ParseTree, comment: str = "ANTLR Parse Tree"):
 def display_example_program():
     vhdl_source_path = join(
         dirname(dirname(dirname(__file__))),  # redhdl/[parser/[vhdl]]
-        "examples",
+        "hdl_examples",
         f"{argv[1]}.vhdl",
     )
 
@@ -246,3 +246,6 @@ def display_example_program():
 
     print("Rendering graph...")
     display_parse_tree(vhdl_tree)
+
+if __name__ == "__main__":
+    display_example_program()
