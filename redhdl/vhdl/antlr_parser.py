@@ -17,7 +17,6 @@ from graphviz import Digraph
 from redhdl.vhdl.vhdlLexer import vhdlLexer
 from redhdl.vhdl.vhdlListener import vhdlListener  # noqa
 from redhdl.vhdl.vhdlParser import vhdlParser
-from redhdl.vhdl.vhdlVisitor import vhdlVisitor  # noqa
 
 
 class AbortSyntaxErrorListener(ErrorListener):
@@ -77,8 +76,8 @@ def vhdl_tree_from_file(path: str) -> ParseTree:
     return vhdl_tree_from_stream(FileStream(path))
 
 
-def vhdl_tree_from_str(query: str) -> ParseTree:
-    return vhdl_tree_from_stream(InputStream(query))
+def vhdl_tree_from_str(source: str) -> ParseTree:
+    return vhdl_tree_from_stream(InputStream(source))
 
 
 # BracketParseTree = list["BracketParseTree"] | str
@@ -246,6 +245,7 @@ def display_example_program():
 
     print("Rendering graph...")
     display_parse_tree(vhdl_tree)
+
 
 if __name__ == "__main__":
     display_example_program()
