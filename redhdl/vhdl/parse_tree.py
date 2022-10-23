@@ -182,3 +182,62 @@ def parse_tree_query(func):
     func.node_type_visitor_func = {}
 
     return wrapper
+
+
+def next_child(
+    children: list[ParseTree],
+    step: int | str,
+) -> ParseTree | None:
+
+    if isinstance(step, int):
+        assert step < len(children)
+        return children[step]
+
+    elif isinstance(step, str):
+        matching_children = [
+            child for child in children if child is not None if child.node_type == step
+        ]
+
+        if len(matching_children) == 0:
+            return None
+        elif len(matching_children) == 1:
+            return matching_children[0]
+        else:
+            raise ValueError(
+                f"Multiple children have node type {step}, expected only one."
+            )
+    else:
+        raise ValueError(
+            f"Path steps are either indices (ints) or node_types (str). Got {step}."
+        )
+
+
+ParseTreeNodeTypePath = list[int | str]
+
+
+def parse_tree_get(
+    parse_tree: ParseTree | None, path: ParseTreeNodeTypePath
+) -> ParseTree | None:
+    if parse_tree is None:
+        return None
+
+    if path == []:
+        return parse_tree
+
+    if len(parse_tree.children) == 0:
+        return None
+
+    next_step, *remaining_path = path
+
+    return parse_tree_get(
+        next_child(parse_tree.children, next_step),
+        remaining_path,
+    )
+
+
+def parse_tree_assert_get(
+    parse_tree: ParseTree, path: ParseTreeNodeTypePath
+) -> ParseTree:
+    node = parse_tree_get(parse_tree, path)
+    assert node is not None, f"Expected node at path {path}, but found nothing."
+    return node
