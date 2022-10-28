@@ -212,16 +212,11 @@ def next_child(
         )
 
 
-ParseTreeNodeTypePath = list[int | str]
-
-
-def parse_tree_get(
-    parse_tree: ParseTree | None, path: ParseTreeNodeTypePath
-) -> ParseTree | None:
+def parse_tree_get(parse_tree: ParseTree | None, *path: int | str) -> ParseTree | None:
     if parse_tree is None:
         return None
 
-    if path == []:
+    if len(path) == 0:
         return parse_tree
 
     if len(parse_tree.children) == 0:
@@ -231,13 +226,11 @@ def parse_tree_get(
 
     return parse_tree_get(
         next_child(parse_tree.children, next_step),
-        remaining_path,
+        *remaining_path,
     )
 
 
-def parse_tree_assert_get(
-    parse_tree: ParseTree, path: ParseTreeNodeTypePath
-) -> ParseTree:
-    node = parse_tree_get(parse_tree, path)
+def parse_tree_assert_get(parse_tree: ParseTree, *path: int | str) -> ParseTree:
+    node = parse_tree_get(parse_tree, *path)
     assert node is not None, f"Expected node at path {path}, but found nothing."
     return node
