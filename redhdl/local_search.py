@@ -40,6 +40,16 @@ def sim_annealing_searched_solution(
     rounds_per_checkpoint: int | None = None,
     checkpoint_func: Callable[[int, Solution, float], None] | None = None,
 ) -> Solution:
+    if total_rounds <= 0:
+        raise ValueError(
+            "Simulated annealing must ran for a positive number of total_rounds."
+        )
+
+    if (rounds_per_checkpoint is None) != (checkpoint_func is None):
+        raise ValueError(
+            "rounds_per_checkpoint and checkpoint must both be None or both be provided."
+        )
+
     # We use random restarts, so we need to track
     # the best we saw throughout all the restart periods.
     best_cost: float | None = None
@@ -70,14 +80,14 @@ def sim_annealing_searched_solution(
             and i > 0
         ):
             assert best_cost is not None and best_solution is not None  # For MyPy.
-            assert (
-                checkpoint_func is not None
-            ), "Cannot checkpoint without a checkpoint_func."
+            assert checkpoint_func is not None  # For MyPy.
             checkpoint_func(i, best_solution, best_cost)
 
         candidate_cost = problem.solution_cost(candidate_solution)
         if problem.good_enough(candidate_solution):
-            print(f"Good enough at {i}/{total_rounds}")
+            print(
+                f"Good enough at round {i+1} of {total_rounds} (cost={candidate_cost})."
+            )
             return candidate_solution
 
         accept_solution = (
