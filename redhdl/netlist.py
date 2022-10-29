@@ -5,6 +5,38 @@ pins and the networks (connections between them).
 These are abstract / logical netlists: They don't represent schematic blocks, regions,
 placements, or bussing. Instances should be subclassed to provide this extra context.
 
+Concepts:
+- Pin: An individual input/output bit on an instance.
+
+- Port: A sequence of input/output bits on an instance, typically a word vector of some length.
+    All pins are part of exactly one port. Ports can contain only a single pin. All pins within
+    the same port are either 'input' or 'output', never mixed.
+    Pins are identified by their index in their associated port, and are otherwise unnamed.
+
+- Instance: A component / black-box chunk of circuitry that has inputs and outputs.
+    Inputs/outputs are specified as ports. Ports are identified by their name, IE "A", "B",
+    "cin", "out", "clock", etc.
+
+- Network: A connection from one output (or 'driver') port on one instance to a set of input
+    ports on other instances. This is how we represent network wire connections.
+    Networks may connect the same instance to itself.
+
+    Networks actually specify both port _and_ a pin ID slice, allowing subsets of a port's
+    pins to drive subsets of other ports' pins. In python notation, for example, we can
+    use a single network to specify:
+        'a[0:4] = b[4:8] = out[0:8:2]'
+
+    This implies that a single port may be used as the driver in multiple networks, and that
+    a single pin may be used as a driver pin in any subset of the networks its port drives.
+
+- Netlist: A set of instances and the networks that connect them.
+    Netlists may have two special instances: "input" and "output".
+    These instances specify, though their outputs and inputs respectively, the inputs
+    and outputs to the netlist circuit as a whole.
+    Netlists are the fundamental unity of circuit assembly, and may be used hierarchically
+    to construct complex circuits. Netlist inherits from Instance.
+
+
 >>> from pprint import pprint
 
 >>> from redhdl.netlist import example_adder_instance
@@ -54,12 +86,12 @@ Netlist(instances={'adder': ExampleInstanceType(...),
               | output |
               +--------+
 """
-
+from abc import ABCMeta
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
 from itertools import groupby
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, cast
 
 from frozendict import frozendict
 
@@ -77,8 +109,11 @@ class Port:
     pin_count: int
 
 
-@dataclass
-class Instance:
+# Sometimes we want ports to be a property, sometimes a dataclass variable.
+# Separate into an ABC abstract interface and a concrete dataclass.
+
+
+class Instance(metaclass=ABCMeta):
     """
     Instance interface.
     It's expected that this will be subclassed to add a variety of useful metadata,
@@ -86,6 +121,17 @@ class Instance:
     """
 
     ports: dict[str, Port]
+
+
+@dataclass
+class SimpleInstance:
+    ports: dict[str, Port]
+
+
+# Avoid weird dataclass / ABCMeta interactions in trying to specify a property
+# interface.
+Instance.register(SimpleInstance)
+assert issubclass(SimpleInstance, Instance)
 
 
 PortName = str
@@ -211,8 +257,10 @@ NetworkId = int
 
 
 @dataclass
-class Netlist:
+class Netlist(Instance):
     """
+    See top-level module __doc__ for background.
+
     Instance: A module with defined input and output ports.
         Has an additional InstanceContext object for external usage.
     Port: An ordered collection of pins. Part of one instance.
@@ -286,7 +334,7 @@ class Netlist:
 
     @property
     def next_network_id(self) -> NetworkId:
-        """Next available Network for netlist manipulations."""
+        """Next available Network ID for netlist manipulations."""
         return (max(self.networks.keys()) + 1) if self.networks else 0
 
     def display_ascii(self) -> None:
@@ -302,6 +350,35 @@ class Netlist:
             }
         )
         draw(vertices, to_from_edges)
+
+    @property  # type: ignore
+    @instance_cache
+    def ports(self) -> dict[str, Port]:
+        """
+        >>> from pprint import pprint
+        >>> from redhdl.netlist import example_netlist
+        >>> pprint(example_netlist.ports)
+        {'out': Port(port_type='out', pin_count=4)}
+        """
+        if "input" in self.instances:
+            input_ports = {
+                name: Port("in", pin_count=port.pin_count)
+                for name, port in self.instances["input"].ports.items()
+                if port.port_type == "out"
+            }
+        else:
+            input_ports = {}
+
+        if "output" in self.instances:
+            output_ports = {
+                name: Port("out", pin_count=port.pin_count)
+                for name, port in self.instances["output"].ports.items()
+                if port.port_type == "in"
+            }
+        else:
+            output_ports = {}
+
+        return input_ports | output_ports
 
     def is_subset(self, other) -> bool:
         """
@@ -369,11 +446,11 @@ class Netlist:
 
 
 @dataclass
-class ExampleInstanceType(Instance):
+class ExampleInstanceType(SimpleInstance):
     context: dict[str, Any]
 
 
-example_adder_instance: Instance = ExampleInstanceType(
+example_adder_instance: Instance = ExampleInstanceType(  # type: ignore
     ports={
         "a": Port("in", pin_count=4),
         "b": Port("in", pin_count=4),
@@ -389,7 +466,7 @@ example_adder_instance: Instance = ExampleInstanceType(
         "placement": None,
     },
 )
-example_constant_instance: Instance = ExampleInstanceType(
+example_constant_instance: Instance = ExampleInstanceType(  # type: ignore
     ports={"out": Port("out", pin_count=4)},
     context={
         "type": "constant",
@@ -412,7 +489,7 @@ example_netlist: Netlist = Netlist(
         "constant_a": deepcopy(example_constant_instance),
         "constant_b": deepcopy(example_constant_instance),
         "adder": deepcopy(example_adder_instance),
-        "output": Instance({"out": Port("out", 4)}),
+        "output": cast(Instance, SimpleInstance({"out": Port("in", 4)})),
     },
     networks={
         0: Network(

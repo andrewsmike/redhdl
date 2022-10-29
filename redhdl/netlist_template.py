@@ -31,6 +31,7 @@ from redhdl.netlist import (
     PinIdSequence,
     Port,
     PortId,
+    SimpleInstance,
 )
 from redhdl.schematic import load_schem
 from redhdl.slice import Slice
@@ -69,13 +70,13 @@ def netlist_from_simple_spec(
         for name, config in instance_config.items()
     }
     io_instances = {
-        "input": Instance(
+        "input": SimpleInstance(
             {
                 name: Port("out", bitwidth)
                 for name, bitwidth in (input_port_bitwidths or {}).items()
             }
         ),
-        "output": Instance(
+        "output": SimpleInstance(
             {
                 name: Port("in", bitwidth)
                 for name, bitwidth in (output_port_bitwidths or {}).items()

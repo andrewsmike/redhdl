@@ -552,6 +552,10 @@ class PointRegion(Region):
     def __ror__(self, other: Region) -> Any:
         return self.__or__(other)
 
+    # Not caching this, which throws off mypy.
+    def region_points(self) -> frozenset[Pos]:  # type: ignore
+        return self.points
+
     def is_empty(self) -> bool:
         return len(self.points) == 0
 

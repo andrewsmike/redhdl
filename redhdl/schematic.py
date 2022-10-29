@@ -119,7 +119,7 @@ class Schematic:
     pos_sign_lines: PositionalData[list[str]]
 
     def __post_init__(self):
-        if self.pos_sign_lines.mask() - self.pos_blocks.mask():
+        if set(self.pos_sign_lines.mask()) - set(self.pos_blocks.mask()):
             raise ValueError(
                 "Attempted to create schematic with inappropriate sign metadata."
             )
