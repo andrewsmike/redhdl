@@ -3,10 +3,12 @@ Positional data: 3d cell (meta)data manipulations.
 """
 from typing import TypeVar
 
-from redhdl.region import Pos, RectangularPrism, Region
+from redhdl.region import PointRegion, Pos, RectangularPrism, Region
+
+PositionMask = set[Pos] | Region
+
 
 BlockData = TypeVar("BlockData")
-PositionMask = set[Pos] | Region
 
 
 class PositionalData(dict[Pos, BlockData]):
@@ -56,4 +58,4 @@ class PositionalData(dict[Pos, BlockData]):
         )
 
     def mask(self) -> PositionMask:
-        return set(self.keys())
+        return PointRegion(frozenset(self.keys()))
