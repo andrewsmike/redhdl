@@ -76,10 +76,7 @@ from typing import (
 from redhdl.slice import Slice
 
 Axis = Literal["x", "y", "z"]
-
 axes = cast(list[Axis], ["x", "y", "z"])
-
-
 X_AXIS_INDEX, Y_AXIS_INDEX, Z_AXIS_INDEX = 0, 1, 2
 
 
@@ -88,8 +85,6 @@ def is_axis(axis: str) -> TypeGuard[Axis]:
 
 
 Direction = Literal["up", "down", "north", "east", "south", "west"]
-
-
 directions: list[Direction] = ["up", "down", "north", "east", "south", "west"]
 
 
@@ -97,7 +92,6 @@ def is_direction(value: str) -> TypeGuard[Direction]:
     return value in directions
 
 
-# Ordered by right-hand-rule rotations on the y axis.
 xz_directions: list[Direction] = [
     "north",
     "east",
@@ -105,7 +99,7 @@ xz_directions: list[Direction] = [
     "west",
 ]
 
-direction_by_axis_ispos: dict[tuple[Axis, bool], Direction] = {
+direction_by_axis_is_pos: dict[tuple[Axis, bool], Direction] = {
     ("x", True): "east",
     ("z", True): "south",
     ("x", False): "west",
@@ -114,8 +108,9 @@ direction_by_axis_ispos: dict[tuple[Axis, bool], Direction] = {
     ("y", False): "down",
 }
 
-direction_axis_ispos = {
-    direction: axis_is_pos for axis_is_pos, direction in direction_by_axis_ispos.items()
+direction_axis_is_pos = {
+    direction: axis_is_pos
+    for axis_is_pos, direction in direction_by_axis_is_pos.items()
 }
 
 
@@ -321,10 +316,9 @@ def random_pos(inclusive_max_pos: Pos) -> Pos:
 @dataclass(frozen=True)
 class PositionSequence:
     """
-    Linear 3d sequence of positions.
-    Defined by start (inclusive), stop (inclusive), and either an offset
-    step Position, or a (total) target number of Positions to linearly space between
-    the start/stop.
+    Linear sequence of 3d positions.
+    Defined by start (inclusive), stop (inclusive), and a (total) target number
+    of Positions to linearly space in the start -> stop line.
 
     >>> list(PositionSequence(Pos(0, 0, 0), Pos(2, 2, 0), count=3))
     [Pos(0, 0, 0), Pos(1, 1, 0), Pos(2, 2, 0)]
@@ -347,9 +341,9 @@ class PositionSequence:
     def __post_init__(self):
         axis_step_counts = (self.stop - self.start) / self.step
 
-        max_step_count = max(abs(axis_step_counts))
+        max_axis_step_count = max(abs(axis_step_counts))
         if not all(
-            (step_count == 0) or (step_count == max_step_count)
+            (step_count == 0) or (step_count == max_axis_step_count)
             for step_count in axis_step_counts
         ):
             raise ValueError(
@@ -426,8 +420,9 @@ class PositionSequence:
         )
 
     def __iter__(self) -> Iterator[Pos]:
+        step = self.step
         for i in range(self.count):
-            yield self.start + (self.step * i)
+            yield self.start + (step * i)
 
     def __len__(self) -> int:
         return self.count
@@ -480,6 +475,9 @@ class Region(metaclass=ABCMeta):
     def is_empty(self) -> bool:
         return len(self) == 0
 
+    def __bool__(self) -> bool:
+        return self.is_empty()
+
     def intersects(self, other: "Region") -> bool:
         return not (self & other).is_empty()
 
@@ -494,21 +492,21 @@ class PointRegion(Region):
     def xz_padded(self, padding_blocks: int = 1) -> Region:
         """
         >>> region = PointRegion(frozenset({Pos(0, 0, 0)})).xz_padded(2)
-        >>> Pos(2, 2, 2) in region
+        >>> Pos(2, 0, 2) in region
         True
-        >>> Pos(3, 2, 2) in region
+        >>> Pos(2, 1, 2) in region
+        False
+        >>> Pos(3, 0, 2) in region
         False
         """
         return PointRegion(
             frozenset(
-                point + Pos(dx, dy, dz)
+                point + Pos(dx, 0, dz)
                 for point in self.points
                 for dx in range(-padding_blocks, padding_blocks + 1)
-                for dy in range(-padding_blocks, padding_blocks + 1)
                 for dz in range(-padding_blocks, padding_blocks + 1)
             )
         )
-        self.min_pos - Pos(padding_blocks, 0, padding_blocks),
 
     def y_rotated(self, quarter_turns: int) -> Region:
         return PointRegion(
@@ -665,11 +663,11 @@ class CompositeRegion(Region):
 
     @cached_property
     def min_pos(self) -> Pos:  # type: ignore
-        return Pos.elem_min(*[region.min_pos for region in self.subregions])
+        return Pos.elem_min(*(region.min_pos for region in self.subregions))
 
     @cached_property
     def max_pos(self) -> Pos:  # type: ignore
-        return Pos.elem_max(*[region.max_pos for region in self.subregions])
+        return Pos.elem_max(*(region.max_pos for region in self.subregions))
 
     def shifted(self, offset: Pos) -> Region:
         return CompositeRegion(
@@ -692,6 +690,7 @@ class CompositeRegion(Region):
     def __len__(self) -> int:
         """
         The area taken by a set of overlapping regions is a hard problem.
+
         This method will not scale gracefully to large numbers of subregions.
         """
         block_count = 0
@@ -798,6 +797,7 @@ def point_ranges(points: set[int], min_gap_size: int = 3) -> list[tuple[int, int
     """
     The minimal set of ranges completely covering a set of points, with gap sizes
     of at least min_gap_size.
+    Resulting ranges are inclusive.
 
     >>> point_ranges({8, 10, 11, 15, 16, 19, 20}, min_gap_size=1)
     [(8, 8), (10, 11), (15, 16), (19, 20)]
