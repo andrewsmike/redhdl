@@ -86,12 +86,11 @@ Netlist(instances={'adder': ExampleInstanceType(...),
               | output |
               +--------+
 """
-from abc import ABCMeta
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
 from itertools import groupby
-from typing import Any, Literal, Optional, cast
+from typing import Any, Literal, Optional
 
 from frozendict import frozendict
 
@@ -109,29 +108,11 @@ class Port:
     pin_count: int
 
 
-# Sometimes we want ports to be a property, sometimes a dataclass variable.
-# Separate into an ABC abstract interface and a concrete dataclass.
-
-
-class Instance(metaclass=ABCMeta):
-    """
-    Instance interface.
-    It's expected that this will be subclassed to add a variety of useful metadata,
-    depending on the purpose.
-    """
-
-    ports: dict[str, Port]
-
-
 @dataclass
-class SimpleInstance:
+class Instance:
+    """Instances have a named set of ports."""
+
     ports: dict[str, Port]
-
-
-# Avoid weird dataclass / ABCMeta interactions in trying to specify a property
-# interface.
-Instance.register(SimpleInstance)
-assert issubclass(SimpleInstance, Instance)
 
 
 PortName = str
@@ -257,12 +238,11 @@ NetworkId = int
 
 
 @dataclass
-class Netlist(Instance):
+class Netlist:
     """
     See top-level module __doc__ for background.
 
     Instance: A module with defined input and output ports.
-        Has an additional InstanceContext object for external usage.
     Port: An ordered collection of pins. Part of one instance.
     Pin: A one-bit input or output. Part of one port. Connected to one network.
     Network: A set of pins. Only one pin may be an 'output' (from an Instance) / driver
@@ -351,13 +331,14 @@ class Netlist(Instance):
         )
         draw(vertices, to_from_edges)
 
-    @property  # type: ignore
     @instance_cache
-    def ports(self) -> dict[str, Port]:
+    def io_ports(self) -> dict[str, Port]:
         """
+        The I/O ports for a given Netlist.
+
         >>> from pprint import pprint
         >>> from redhdl.netlist import example_netlist
-        >>> pprint(example_netlist.ports)
+        >>> pprint(example_netlist.io_ports())
         {'out': Port(port_type='out', pin_count=4)}
         """
         if "input" in self.instances:
@@ -446,11 +427,11 @@ class Netlist(Instance):
 
 
 @dataclass
-class ExampleInstanceType(SimpleInstance):
+class ExampleInstanceType(Instance):
     context: dict[str, Any]
 
 
-example_adder_instance: Instance = ExampleInstanceType(  # type: ignore
+example_adder_instance: Instance = ExampleInstanceType(
     ports={
         "a": Port("in", pin_count=4),
         "b": Port("in", pin_count=4),
@@ -466,7 +447,7 @@ example_adder_instance: Instance = ExampleInstanceType(  # type: ignore
         "placement": None,
     },
 )
-example_constant_instance: Instance = ExampleInstanceType(  # type: ignore
+example_constant_instance: Instance = ExampleInstanceType(
     ports={"out": Port("out", pin_count=4)},
     context={
         "type": "constant",
@@ -489,7 +470,7 @@ example_netlist: Netlist = Netlist(
         "constant_a": deepcopy(example_constant_instance),
         "constant_b": deepcopy(example_constant_instance),
         "adder": deepcopy(example_adder_instance),
-        "output": cast(Instance, SimpleInstance({"out": Port("in", 4)})),
+        "output": Instance({"out": Port("in", 4)}),
     },
     networks={
         0: Network(

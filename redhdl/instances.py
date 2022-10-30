@@ -6,7 +6,7 @@ Simple patterns will, with luck, give way to more complicated stacking semantics
 """
 from dataclasses import dataclass, replace
 
-from redhdl.netlist import Port, SimpleInstance
+from redhdl.netlist import Instance, Port
 from redhdl.region import (
     Direction,
     Pos,
@@ -37,13 +37,11 @@ class RepeaterPort(Port):
 
 
 @dataclass
-class SchematicInstance(SimpleInstance):
-    """
-    Instances are attached to a particular netlist and aren't easily mutable.
-    For routing logic, prefer compiling to a different datatype for manipulations.
-    """
+class SchematicInstance(Instance):
+    """An instance with an attached, predetermined schematic."""
 
     name: str
 
     schematic: Schematic
     region: Region
+    # port_placement: dict[str, RepeaterPortPlacement]
