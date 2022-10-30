@@ -45,55 +45,47 @@ Schematic(pos_blocks={Pos(0, 0, 0): Block(block_type='minecraft:oak_wall_sign',
                           Pos(4, 3, 4): ['PLACEHOLDER']})
 
 >>> pprint(schematic_instance_from_schem(schem))
-SchematicInstance(ports={'a': RepeaterPort(port_type='input',
-                                           pin_count=1,
-                                           positions=PositionSequence(Pos(1, 0, 0), Pos(1, 0, 0), count=1),
-                                           facing='south'),
-                         'b': RepeaterPort(port_type='output',
-                                           pin_count=1,
-                                           positions=PositionSequence(Pos(2, 0, 2), Pos(2, 0, 2), count=1),
-                                           facing='south')},
+SchematicInstance(ports={'a': Port(port_type='input', pin_count=1),
+                         'b': Port(port_type='output', pin_count=1)},
                   name='diagonal not',
                   schematic=Schematic(...),
-                  region=RectangularPrism(Pos(0, 0, 0), Pos(2, 1, 2)))
-
+                  region=RectangularPrism(Pos(0, 0, 0), Pos(2, 1, 2)),
+                  port_placement={'a': RepeaterPortPlacement(positions=PositionSequence(Pos(1, 0, 0), Pos(1, 0, 0), count=1),
+                                                             facing='south'),
+                                  'b': RepeaterPortPlacement(positions=PositionSequence(Pos(2, 0, 2), Pos(2, 0, 2), count=1),
+                                                             facing='south')})
 >>> and_schem = load_schem("schematic_examples/hdl_and_h8b.schem")
 >>> pprint(schematic_instance_from_schem(and_schem))
-SchematicInstance(ports={'a': RepeaterPort(port_type='input',
-                                           pin_count=8,
-                                           positions=PositionSequence(Pos(0, 2, 0), Pos(14, 2, 0), count=8),
-                                           facing='south'),
-                         'b': RepeaterPort(port_type='input',
-                                           pin_count=8,
-                                           positions=PositionSequence(Pos(0, 0, 0), Pos(14, 0, 0), count=8),
-                                           facing='south'),
-                         'out': RepeaterPort(port_type='output',
-                                             pin_count=8,
-                                             positions=PositionSequence(Pos(0, 1, 2), Pos(14, 1, 2), count=8),
-                                             facing='south')},
+SchematicInstance(ports={'a': Port(port_type='input', pin_count=8),
+                         'b': Port(port_type='input', pin_count=8),
+                         'out': Port(port_type='output', pin_count=8)},
                   name='and_h8b',
                   schematic=Schematic(...),
-                  region=RectangularPrism(Pos(0, 0, 0), Pos(14, 3, 2)))
+                  region=RectangularPrism(Pos(0, 0, 0), Pos(14, 3, 2)),
+                  port_placement={'a': RepeaterPortPlacement(positions=PositionSequence(Pos(0, 2, 0), Pos(14, 2, 0), count=8),
+                                                             facing='south'),
+                                  'b': RepeaterPortPlacement(positions=PositionSequence(Pos(0, 0, 0), Pos(14, 0, 0), count=8),
+                                                             facing='south'),
+                                  'out': RepeaterPortPlacement(positions=PositionSequence(Pos(0, 1, 2), Pos(14, 1, 2), count=8),
+                                                               facing='south')})
 
 >>> not_schem = load_schem("schematic_examples/hdl_not_h8b.schem")
 >>> pprint(schematic_instance_from_schem(not_schem))
-SchematicInstance(ports={'in': RepeaterPort(port_type='input',
-                                            pin_count=8,
-                                            positions=PositionSequence(Pos(0, 0, 0), Pos(14, 0, 0), count=8),
-                                            facing='south'),
-                         'out': RepeaterPort(port_type='output',
-                                             pin_count=8,
-                                             positions=PositionSequence(Pos(0, 0, 3), Pos(14, 0, 3), count=8),
-                                             facing='south')},
+SchematicInstance(ports={'in': Port(port_type='input', pin_count=8),
+                         'out': Port(port_type='output', pin_count=8)},
                   name='not_h8b',
                   schematic=Schematic(...),
-                  region=RectangularPrism(Pos(0, 0, 0), Pos(14, 1, 3)))
+                  region=RectangularPrism(Pos(0, 0, 0), Pos(14, 1, 3)),
+                  port_placement={'in': RepeaterPortPlacement(positions=PositionSequence(Pos(0, 0, 0), Pos(14, 0, 0), count=8),
+                                                              facing='south'),
+                                  'out': RepeaterPortPlacement(positions=PositionSequence(Pos(0, 0, 3), Pos(14, 0, 3), count=8),
+                                                               facing='south')})
 """
 from re import match
 from typing import cast
 
-from redhdl.instances import Port, RepeaterPort, SchematicInstance
-from redhdl.netlist import PortType
+from redhdl.instances import RepeaterPortPlacement, SchematicInstance
+from redhdl.netlist import Port, PortType
 from redhdl.positional_data import PositionalData
 from redhdl.region import (
     Direction,
@@ -177,6 +169,7 @@ def schematic_instance_from_schem(schem: Schematic) -> SchematicInstance:
         port_index_position[(port_name, pin_index)] = pos
 
     ports = {}
+    port_placement = {}
     for port_name in port_type.keys():
         pin_count = max(port_indices[port_name]) + 1
         assert (
@@ -200,9 +193,12 @@ def schematic_instance_from_schem(schem: Schematic) -> SchematicInstance:
         else:
             raise ValueError
 
-        ports[port_name] = RepeaterPort(
+        ports[port_name] = Port(
             pin_count=pin_count,
             port_type=cast(PortType, port_type[port_name]),
+        )
+
+        port_placement[port_name] = RepeaterPortPlacement(
             positions=PositionSequence(
                 start_sign_pos + sign_base_block_offset + normalized_offset,
                 stop_sign_pos + sign_base_block_offset + normalized_offset,
@@ -216,4 +212,5 @@ def schematic_instance_from_schem(schem: Schematic) -> SchematicInstance:
         ports=cast(dict[str, Port], ports),
         schematic=core_schem_normalized,
         region=core_schem_normalized.rect_region(),
+        port_placement=port_placement,
     )
