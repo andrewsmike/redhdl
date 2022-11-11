@@ -1,3 +1,28 @@
+"""
+Path search: Use graph search algorithms (such as A*) to find solutions to well
+defined problems.
+
+Problems are specified by subclassing (then instantiating) PathSearchProblems.
+
+Once problems are specified, we provide two search methods for problems:
+- a_star_bfs_searched_solution
+    Breadth-first A* search of the solution space.
+    Ideal for problems with a low branching factord; can be somewhat
+    memory inefficient and slower for wider problems with a persistently high
+    effective branching factor, or problems where branches don't usually fold
+    back into each other (like exploring in a grid).
+
+- a_star_iddfs_searched_solution
+    Iterative deepening depth-first A* search of the solution space.
+    This method has a substantially lower memory footprint/execution time for
+    problems with a wider branching factor, but can be substantially slower on
+    constrained problems (like exploring in a grid) where branches usually fold
+    back into each other or the effective branching factor drops dramatically
+    after the first few steps.
+
+These methods raise the SearchErrors NoSolutionError and SearchTimeoutError on
+failure.
+"""
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from heapq import heappop, heappush
@@ -119,9 +144,9 @@ def a_star_iddfs_searched_solution(
     traditional priority-queue-based breadth first search.
 
     BFS is moderately memory hungry, and memory has a substantial IO/compute
-    footprint. Since the branching factor is nonzero, it's often faster to
-    evaluate the core of the tree multiple times than it is to perfectly keep
-    track of everything in a queue.
+    footprint. If the effective branching factor of a problem is >=2 after a
+    few steps, it's often faster to evaluate the core of the tree multiple times
+    than it is to perfectly keep track of everything in a queue.
     """
 
     steps_remaining: int
