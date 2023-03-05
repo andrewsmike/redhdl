@@ -63,7 +63,9 @@ from redhdl.region import (
 from redhdl.schematic import Block, Schematic
 
 SignalStrength = Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-signal_strengths = cast(list[SignalStrength], list(range(16)))
+
+
+signal_strengths = cast(list[SignalStrength], list(range(1, 16)))
 
 
 class RedstoneBussingError(BussingError):
@@ -217,9 +219,6 @@ class RedstoneBussing:
         )
 
     def wire_possible_directions(self, wire_block: Pos) -> set[Direction]:
-        """
-        TODO: What about attractors causing the wire to point in the opposite direction?
-        """
         directions_with_wire = {
             direction
             for direction in xz_directions
