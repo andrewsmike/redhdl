@@ -145,7 +145,7 @@ def a_star_iddfs_searched_solution(
 
     BFS is moderately memory hungry, and memory has a substantial IO/compute
     footprint. If the effective branching factor of a problem is >=2 after a
-    few steps, it's often faster to evaluate the core of the tree multiple times
+    few steps, it's sometimes faster to evaluate the core of the tree multiple times
     than it is to perfectly keep track of everything in a queue.
     """
 
@@ -165,11 +165,11 @@ def a_star_iddfs_searched_solution(
 
         state_min_cost[step.state] = step.cost
 
-        if problem.is_goal_state(step.state):
-            return step, False, None
-
         if step.min_cost > max_cost:
             return None, True, step.min_cost
+
+        if problem.is_goal_state(step.state):
+            return step, False, None
 
         nonlocal steps_remaining
         if steps_remaining == 0:
@@ -221,11 +221,14 @@ def a_star_bfs_searched_solution(
     first_step = Step.initial_step(problem.initial_state())
     next_best_action_heap = [first_step]
 
-    explored_states: set[State] = {first_step.state}
+    explored_states: set[State] = set()
 
     remaining_steps: int = max_steps
     while len(next_best_action_heap) > 0 and remaining_steps > 0:
         step = heappop(next_best_action_heap)
+        if step.state in explored_states:
+            continue
+
         if problem.is_goal_state(step.state):
             return step.action_sequence()
 

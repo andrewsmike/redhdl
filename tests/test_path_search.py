@@ -1,5 +1,8 @@
-from dataclasses import dataclass
+from contextlib import ExitStack, contextmanager
+from dataclasses import field, dataclass
 from time import time
+from typing import Literal
+from unittest.mock import patch
 
 from redhdl.region import Direction, Pos, direction_unit_pos, xz_directions
 from redhdl.path_search import (
@@ -11,7 +14,7 @@ from redhdl.path_search import (
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class PlanarPathSearchProblem(PathSearchProblem[Pos, Direction]):
     wall_poses: set[Pos]
     start_pos: Pos
@@ -41,7 +44,7 @@ class PlanarPathSearchProblem(PathSearchProblem[Pos, Direction]):
     def min_distance(self, state: Pos) -> float:
         return (state - self.end_pos).l1()
 
-    def display_solution(self, solution: list[Direction]):
+    def display_solution_str(self, solution: list[Direction]):
         solution_positions = set()
         current_pos = self.start_pos
         for step_direction in solution:
@@ -50,24 +53,17 @@ class PlanarPathSearchProblem(PathSearchProblem[Pos, Direction]):
 
         all_positions = set(solution_positions) | self.wall_poses | {self.start_pos, self.end_pos}
 
-        min_x, max_x = (
-            min(x for x, y, z in all_positions),
-            max(x for x, y, z in all_positions),
-        )
-
-        min_y, max_y = (
-            min(z for x, y, z in all_positions),
-            max(z for x, y, z in all_positions),
-        )
+        min_x, _, min_z = Pos.elem_min(*all_positions)
+        max_x, _, max_z = Pos.elem_max(*all_positions)
 
         lines = []
-        for y in range(min_y, max_y + 1):
+        for z in range(min_z, max_z + 1):
             wall_poses: set[Pos]
             start_pos: Pos
             end_pos: Pos
             line = ""
             for x in range(min_x, max_x + 1):
-                pos = Pos(x, 0, y)
+                pos = Pos(x, 0, z)
                 if pos in self.wall_poses:
                     pos_char = "#"
                 elif pos == self.start_pos:
@@ -134,7 +130,7 @@ planar_path_problem = planar_path_problem_search_from_map(problem_map)
 
 def test_bfs_search():
     solution = a_star_bfs_searched_solution(planar_path_problem)
-    print(planar_path_problem.display_solution(solution))
+    print(planar_path_problem.display_solution_str(solution))
     assert planar_path_problem.solution_valid(solution)
     assert len(solution) == 17
 
@@ -150,7 +146,7 @@ def test_bfs_efficiency():
 
 def test_iddfs_search():
     solution = a_star_bfs_searched_solution(planar_path_problem)
-    print(planar_path_problem.display_solution(solution))
+    print(planar_path_problem.display_solution_str(solution))
     assert planar_path_problem.solution_valid(solution)
     assert len(solution) == 17
 
@@ -165,7 +161,188 @@ def test_iddfs_efficiency():
     assert end_time - start_time < 2
 
 
+AlgoAction = Literal[
+    "initial_state",
+    "state_actions",
+    "state_action_result",
+    "state_action_cost",
+    "is_goal_state",
+    "min_distance",
+]
+
+
 @dataclass
+class AlgoStep:
+    algo_action: AlgoAction
+    state: State | None = None
+    action: Action | None = None
+
+
+@dataclass
+class TracedPathSearchProblem(PathSearchProblem[State, Action]):
+    problem: PathSearchProblem[State, Action]
+    algo_steps: list[AlgoStep] = field(default_factory=list)
+
+    def initial_state(self) -> State:
+        self.algo_steps.append(AlgoStep("initial_state"))
+        return self.problem.initial_state()
+
+    def state_actions(self, state: State) -> list[Action]:
+        self.algo_steps.append(AlgoStep("state_actions", state))
+        return self.problem.state_actions(state)
+
+    def state_action_result(self, state: State, action: Action) -> State:
+        self.algo_steps.append(AlgoStep("state_action_result", state, action))
+        return self.problem.state_action_result(state, action)
+
+    def state_action_cost(self, state: State, action: Action) -> float:
+        self.algo_steps.append(AlgoStep("state_action_cost", state, action))
+        return self.problem.state_action_cost(state, action)
+
+    def is_goal_state(self, state: State) -> bool:
+        self.algo_steps.append(AlgoStep("is_goal_state", state))
+        return self.problem.is_goal_state(state)
+
+    def min_distance(self, state: State) -> float:
+        self.algo_steps.append(AlgoStep("min_distance", state))
+        return self.problem.min_distance(state)
+
+
+def steps_2d_map_str(steps: list[Pos]) -> str:
+    pos_indices = {}
+    for step in steps:
+        if step not in pos_indices:
+            pos_indices[step] = len(pos_indices)
+
+    min_x, _, min_z = Pos.elem_min(*steps)
+    max_x, _, max_z = Pos.elem_max(*steps)
+
+    return "\n".join(
+        "".join(
+            f"{pos_indices.get(Pos(x, 0, z), -1):3d}"
+            for x in range(min_x, max_x + 1)
+        )
+        for z in range(min_z, max_z + 1)
+    )
+
+
+@contextmanager
+def fully_order_steps():
+    """
+    Force path search methods to deterministically order all next steps, rather than
+    allowing min-cost-equivalent states to be ordered arbitrarily or nondeterministically.
+
+    This is useful for reproducible testing.
+    """
+    def cmp_key(step) -> tuple[float, float, State, Action]:
+        return (step.min_cost, - step.cost, tuple(step.state), step.action)
+
+    with ExitStack() as stack:
+        for patch_func_name, patch_func in [
+            ("__eq__", lambda self, other: cmp_key(self) == cmp_key(other)),
+            ("__lt__", lambda self, other: cmp_key(self) < cmp_key(other)),
+            ("__le__", lambda self, other: cmp_key(self) <= cmp_key(other)),
+            ("__gt__", lambda self, other: cmp_key(self) > cmp_key(other)),
+            ("__ge__", lambda self, other: cmp_key(self) >= cmp_key(other)),
+
+        ]:
+            stack.enter_context(patch(f"redhdl.path_search.Step.{patch_func_name}", patch_func))
+
+        yield
+
+
+@fully_order_steps()
+def display_bfs_expansion_order():
+    """
+    Example visual of the expansion order.
+    This _should_ be consistent within the same algorithm, and is helpful for
+    verifying search semantics.
+
+    >>> display_bfs_expansion_order()  # doctest: +NORMALIZE_WHITESPACE
+    Solution path:
+    @@@@@@@@@@e
+    @
+    @########
+    @@      #
+     @      #
+     @      #
+     s      #
+            #
+    ...
+    Expansion order:
+     34 35 36 37 38 39 40 41 42 43
+     33 -1 -1 -1 -1 -1 -1 -1 -1 -1
+     32 -1 -1 -1 -1 -1 -1 -1 -1 -1
+     31  3  4  5  6  7  8  9 -1 -1
+     -1  2 10 11 12 13 14 15 -1 -1
+     -1  1 16 17 18 19 20 21 -1 -1
+     -1  0 22 23 24 25 26 27 -1 -1
+     -1 -1 -1 -1 -1 30 29 28 -1 -1
+    """
+    traced_problem = TracedPathSearchProblem(planar_path_problem)
+    solution = a_star_bfs_searched_solution(traced_problem)
+    assert planar_path_problem.solution_valid(solution)
+    assert len(solution) == 17
+
+    print("Solution path:")
+    print(planar_path_problem.display_solution_str(solution))
+    print("...")
+    print("Expansion order:")
+    print(steps_2d_map_str(
+        [
+            step.state
+            for step in traced_problem.algo_steps
+            if step.algo_action == "state_actions"
+        ]
+    ))
+
+
+@fully_order_steps()
+def display_iddfs_expansion_order():
+    """
+    Example visual of the expansion order.
+    This _should_ be consistent within the same algorithm, and is helpful for
+    verifying search semantics.
+
+    >>> display_iddfs_expansion_order()  # doctest: +NORMALIZE_WHITESPACE
+    Solution path:
+              e
+    @@@@@@@@@@@
+    @########
+    @@      #
+     @      #
+     @      #
+     s      #
+            #
+    ...
+    Expansion order:
+     36 37 38 39 40 41 42 43 44 45 46
+     35 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+     34 27 24 21 18 15 12  9 -1 -1 -1
+     -1 26 23 20 17 14 11  8 -1 -1 -1
+     -1 25 22 19 16 13 10  7 -1 -1 -1
+     -1  0  1  2  3  4  5  6 -1 -1 -1
+     -1 -1 33 32 31 30 29 28 -1 -1 -1
+    """
+    traced_problem = TracedPathSearchProblem(planar_path_problem)
+    solution = a_star_iddfs_searched_solution(traced_problem)
+    assert planar_path_problem.solution_valid(solution)
+    assert len(solution) == 17
+
+    print("Solution path:")
+    print(planar_path_problem.display_solution_str(solution))
+    print("...")
+    print("Expansion order:")
+    print(steps_2d_map_str(
+        [
+            step.state
+            for step in traced_problem.algo_steps
+            if step.algo_action == "state_actions"
+        ]
+    ))
+
+
+@dataclass(frozen=True)
 class BinarySearchProblem(PathSearchProblem[tuple[int], int]):
     hard_hint: bool
     solution: tuple[int]
@@ -221,29 +398,30 @@ def test_hinting_bsp_problem():
 
 def print_benchmarks():
     """
-    Example output for a high-branching-factor problem:
-    ('bfs', 'hints', 14.899113416671753)
-    ('bfs', 'no_hints', 12.301818132400513)
-    ('iddfs', 'hints', 1.8538579940795898)
-    ('iddfs', 'no_hints', 1.8927991390228271)
+    # >>> print_benchmarks()
+
+    Without state caching in iddfs:
+    ('hinting_bsp', 'bfs', 6.307959079742432)
+    ('hinting_bsp', 'iddfs', 5.053704023361206)
+    ('no_hinting_bsp', 'bfs', 6.303386926651001)
+    ('no_hinting_bsp', 'iddfs', 5.0512471199035645)
+    ('path_search', 'bfs', 0.05878019332885742)
+    ('path_search', 'iddfs', 7.332165956497192)
     """
-    for algo_name in ["bfs", "iddfs"]:
-        for problem_name in ["hints", "no_hints"]:
+    for problem_name, problem in {
+        "hinting_bsp": hinting_bsp,
+        "no_hinting_bsp": no_hinting_bsp,
+        "path_search": planar_path_problem,
+    }.items():
+        for algo_name in ["bfs", "iddfs"]:
             algo = {
                 "bfs": a_star_bfs_searched_solution,
                 "iddfs": a_star_iddfs_searched_solution,
             }[algo_name]
-
-            problem = {
-                "hints": hinting_bsp,
-                "no_hints": no_hinting_bsp,
-            }[problem_name]
 
             start_time = time()
             for i in range(100):
                 algo(problem)
 
             end_time = time()
-            print((algo_name, problem_name, end_time - start_time))
-
-    assert False
+            print((problem_name, algo_name, end_time - start_time))
