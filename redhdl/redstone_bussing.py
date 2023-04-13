@@ -9,11 +9,6 @@ Encodes the logic necessary to bus:
 - While avoiding getting hard/soft powered by another bus
 - Compactly AF
 
-TODO:
-- Test like hell
-- Encode a reasonable relaxation mechanism (make rules soft).
-
-
 Examples:
 >>> bussing = redstone_bussing(
 ...     start_pos=Pos(0, 0, 0),

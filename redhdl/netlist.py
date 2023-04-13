@@ -9,13 +9,13 @@ Concepts:
 - Pin: An individual input/output bit on an instance.
 
 - Port: A sequence of input/output bits on an instance, typically a word vector of some length.
-    All pins are part of exactly one port. Ports can contain only a single pin. All pins within
-    the same port are either 'input' or 'output', never mixed.
-    Pins are identified by their index in their associated port, and are otherwise unnamed.
+    All pins are part of exactly one port. All pins within the same port are either 'input' or
+    'output', never mixed. Pins are identified by their index in their associated port, and are
+    otherwise unnamed.
 
 - Instance: A component / black-box chunk of circuitry that has inputs and outputs.
     Inputs/outputs are specified as ports. Ports are identified by their name, IE "A", "B",
-    "cin", "out", "clock", etc.
+    "cin", "cout", "dout", "clock", etc.
 
 - Network: A connection from one output (or 'driver') port on one instance to a set of input
     ports on other instances. This is how we represent network wire connections.
@@ -28,6 +28,7 @@ Concepts:
 
     This implies that a single port may be used as the driver in multiple networks, and that
     a single pin may be used as a driver pin in any subset of the networks its port drives.
+    A port may be driven by multiple networks, but each individual pin may not.
 
 - Netlist: A set of instances and the networks that connect them.
     Netlists may have two special instances: "input" and "output".
