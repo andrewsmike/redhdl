@@ -8,7 +8,6 @@ Region types:
 - TODO: Efficient diagonal polyhedra for diagonal circuits.
 
 Example usages:
->>> from pprint import pprint
 >>> from redhdl.region import CompositeRegion, RectangularPrism
 
 >>> example = RectangularPrism(Pos(0, 0, 0), Pos(2, 3, 4))

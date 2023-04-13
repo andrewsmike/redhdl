@@ -1,5 +1,4 @@
 """
->>> from pprint import pprint
 >>> netlist = netlist_from_simple_spec(example_instance_configs, example_network_specs)
 >>> pprint(netlist)
 Netlist(instances={'and': SchematicInstance(...),

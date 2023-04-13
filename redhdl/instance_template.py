@@ -20,7 +20,6 @@ Port describing signs:
 - All other lines are currently ignored. They could be used to encode more
     sophisticated bus connecter logic.
 
->>> from pprint import pprint
 >>> from redhdl.schematic import load_schem
 >>> schem = load_schem("schematic_examples/hdl_diagonal_not.schem")
 >>> pprint(schem)

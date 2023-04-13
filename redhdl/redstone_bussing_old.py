@@ -23,7 +23,6 @@ Examples:
 ...     max_steps=10000,
 ... )
 
->>> from pprint import pprint
 >>> pprint(bussing)
 RedstoneBussing(element_sig_strengths=frozendict.frozendict({Pos(0, 0, 0): 15, ..., Pos(3, 2, 2): 10}),
                 repeater_directions=frozendict.frozendict({}),
@@ -560,7 +559,6 @@ class RedstonePathFindingProblem(
     ...     repeater_cost=6,
     ... )
 
-    >>> from pprint import pprint
     >>> steps = a_star_bfs_searched_solution(problem, max_steps=500)
     >>> pprint(steps)
     [RedstonePathStep(next_pos=Pos(1, 1, 0), is_repeater=False, facing=None),

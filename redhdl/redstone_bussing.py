@@ -556,7 +556,6 @@ class RedstonePathFindingProblem(
     ...     repeater_cost=6,
     ... )
 
-    >>> from pprint import pprint
     >>> steps = a_star_bfs_searched_solution(problem, max_steps=500)
     >>> pprint(steps)
     [RedstonePathStep(next_pos=Pos(1, 1, 0), is_repeater=False, facing=None),

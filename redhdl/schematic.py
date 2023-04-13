@@ -1,5 +1,4 @@
 """
->>> from pprint import pprint
 >>> schem = load_schem("schematic_examples/hdl_diagonal_not.schem")
 >>> pprint(schem)
 Schematic(pos_blocks={Pos(0, 0, 0): Block(block_type='minecraft:oak_wall_sign',
