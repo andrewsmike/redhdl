@@ -18,7 +18,6 @@ Examples:
 ...     max_steps=10000,
 ... )
 
->>> from pprint import pprint
 >>> pprint(bussing)
 RedstoneBussing(element_sig_strengths=frozendict.frozendict({Pos(0, 0, 0): 15, ..., Pos(3, 2, 2): 10}),
                 repeater_directions=frozendict.frozendict({}),
