@@ -8,7 +8,7 @@ from typing import Iterable, cast
 from frozendict import frozendict
 from tqdm import tqdm
 
-from redhdl.instances import RepeaterPortPlacement, SchematicInstance
+from redhdl.instances import SchematicInstance
 from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
 from redhdl.netlist import InstanceId, Netlist, PinId, PinIdSequence
 from redhdl.region import (
@@ -77,10 +77,6 @@ def placement_pin_seq_points(
 ) -> PositionSequence:
     """
     The position sequence corresponding to the given PinIdSequence in a given placement.
-
-    This makes some moderately heavy assumptions about how ports are structured in 3d space.
-    Currently, it hard asserts the instance / port to be SchematicInstance and
-    RepeaterPortPlacement to avoid failing silently during future refactors.
     """
     instance_id, port_name = pin_id_seq.port_id
     instance = netlist.instances[instance_id]
@@ -93,24 +89,15 @@ def placement_pin_seq_points(
         )
 
     port_placement = instance.port_placement[port_name]
-    if not isinstance(port_placement, RepeaterPortPlacement):
-        raise ValueError(
-            "Attempted to find pin position sequence for a PortPlacement that wasn't "
-            + " a RepeaterPortPlacement."
-        )
 
-    base_pin_points = (port_placement.positions & pin_id_seq.slice) + Pos(0, 1, 0)
-
-    # Offset back/forward for inputs/outputs.
-    pin_points = {
-        "output": base_pin_points + direction_unit_pos[port_placement.facing],
-        "input": base_pin_points - direction_unit_pos[port_placement.facing],
-    }[port.port_type]
+    wire_points = (
+        port_placement.positions & pin_id_seq.slice
+    ) + port_placement.port_interface.wire_offset(port.port_type)
 
     instance_id, _ = pin_id_seq.port_id
     instance_pos, instance_dir = placement[instance_id]
 
-    return pin_points.y_rotated(xz_directions.index(instance_dir)) + instance_pos
+    return wire_points.y_rotated(xz_directions.index(instance_dir)) + instance_pos
 
 
 @dataclass(frozen=True, order=True)
