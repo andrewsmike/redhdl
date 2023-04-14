@@ -261,12 +261,11 @@ class Netlist:
     the I/O ports of the entire netlist.
 
     The top level netlist represents instances and available networks.
-    Here we use dictionaries from ID -> <object> to avoid tricky vector-packing logic and
-    IDs for everything to reduce the amount of state and simplify reasoning.
+    Here we use dictionaries from NetworkId: int -> <object> to avoid tricky vector-packing logic
+    and use IDs for everything to reduce the amount of state / simplify reasoning.
     """
 
     instances: dict[InstanceId, Instance]
-    "Dictionary so we don't have to pack a vector when manipulating netlists."
     networks: dict[NetworkId, Network]
     "Dictionary so we don't have to pack a vector when manipulating netlists."
 

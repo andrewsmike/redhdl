@@ -1,4 +1,22 @@
 """
+Create a netlist of schematic-backed instances from a simple spec.
+
+Describe your instances and their configuration (here, schematic path):
+>>> pprint(example_instance_configs)
+{'and': {'schem_name': 'and_h8b'},
+ 'not_a': {'schem_name': 'not_h8b'},
+ 'not_b': {'schem_name': 'not_h8b'},
+ 'not_out': {'schem_name': 'not_h8b'}}
+
+Specify the I/O relationships between your instances:
+>>> pprint(example_network_specs)
+{(('and', 'out'), Slice(0, 8, 1)): {(('output', 'out'), Slice(0, 8, 1))},
+ (('input', 'a'), Slice(0, 8, 1)): {(('not_a', 'in'), Slice(0, 8, 1))},
+ (('input', 'b'), Slice(0, 8, 1)): {(('not_b', 'in'), Slice(0, 8, 1))},
+ (('not_a', 'out'), Slice(0, 8, 1)): {(('and', 'a'), Slice(0, 8, 1))},
+ (('not_b', 'out'), Slice(0, 8, 1)): {(('and', 'b'), Slice(0, 8, 1))}}
+
+Generate a thoroughly-typed Netlist object, with SchematicInstances, representing your netlist.
 >>> netlist = netlist_from_simple_spec(example_instance_configs, example_network_specs)
 >>> pprint(netlist)
 Netlist(instances={'and': SchematicInstance(...),
@@ -18,6 +36,29 @@ Netlist(instances={'and': SchematicInstance(...),
                                                                         'out'),
                                                                slice=Slice(0, 8, 1))}),
                   ...})
+
+>>> netlist.display_ascii()  # doctest: +NORMALIZE_WHITESPACE
+            +-------+
+            | input |
+            +-------+
+            **      **
+           *          *
+          *            *
+    +-------+       +-------+
+    | not_a |       | not_b |
+    +-------+       +-------+
+            **      **
+              *    *
+               *  *
+             +-----+
+             | and |
+             +-----+
+                *
+                *
+                *
+            +--------+
+            | output |
+            +--------+
 """
 from typing import cast
 
