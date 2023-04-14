@@ -1,11 +1,11 @@
 """
-Simple 3d region representation and manipulation library.
+3d region library with set-like operations.
 
 Region types:
-- Point prisms
+- Point collections
 - Rectangular prisms
 - Composite regions
-- TODO: Efficient diagonal polyhedra for diagonal circuits.
+- Potential future add: Diagonal polyhedra for diagonal circuits.
 
 Example usages:
 >>> from redhdl.region import CompositeRegion, RectangularPrism

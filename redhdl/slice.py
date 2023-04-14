@@ -1,10 +1,12 @@
+"""slice(), but hashable."""
 from typing import Iterator
 
 
 class Slice:
     """
-    Hashable slice type, because slice() is unhashable to avoid accidental
-    dict assignments.
+    Immutable / hashable slice type.
+
+    The built-in slice() is unhashable to avoid accidental dict assignments.
 
     >>> Slice(4)
     Slice(0, 4, 1)
