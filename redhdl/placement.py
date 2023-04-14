@@ -1,3 +1,12 @@
+"""
+Placement tools and bussing-naive search methods.
+
+Placements are mappings from InstanceIds to (Position, Direction).
+Bussing-naive placement search is a first-past heuristic search that's useful in the construction of
+more advanced and adaptive bussing-aware search.
+
+Placement is SchematicInstance specific and provides schematic-specific helpers.
+"""
 from dataclasses import dataclass
 from functools import reduce
 from itertools import combinations
@@ -123,17 +132,20 @@ def source_dest_pin_pos_pairs(
                 netlist, dest_pin_id_seq, placement
             )
 
-            for (source_pin_id, source_pin_pos), (dest_pin_id, dest_pin_pos) in zip(
-                zip(network.input_pin_id_seq.slice, source_pin_points),
-                zip(dest_pin_id_seq.slice, dest_pin_points),
-            ):
-
-                yield PinPosPair(
-                    source_pin_id=(network.input_pin_id_seq.port_id, source_pin_id),
+            yield from (
+                PinPosPair(
+                    source_pin_id=source_pin_id,
                     source_pin_pos=source_pin_pos,
-                    dest_pin_id=(dest_pin_id_seq.port_id, dest_pin_id),
+                    dest_pin_id=dest_pin_id,
                     dest_pin_pos=dest_pin_pos,
                 )
+                for source_pin_id, source_pin_pos, dest_pin_id, dest_pin_pos in zip(
+                    network.input_pin_id_seq.pin_ids,
+                    source_pin_points,
+                    dest_pin_id_seq.pin_ids,
+                    dest_pin_points,
+                )
+            )
 
 
 def display_placement(netlist: Netlist, placement: InstancePlacement):

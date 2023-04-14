@@ -128,7 +128,7 @@ class PinIdSequence:
 
     @property
     def pin_ids(self) -> list[PinId]:
-        return [(self.port_id, pin_id) for pin_id in self.slice]
+        return [(self.port_id, pin_index) for pin_index in self.slice]
 
     def __len__(self):
         return len(self.pin_ids)
