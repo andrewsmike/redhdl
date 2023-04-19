@@ -24,10 +24,10 @@ These methods raise the SearchErrors NoSolutionError and SearchTimeoutError on
 failure.
 """
 from abc import ABCMeta, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from heapq import heappop, heappush
 from math import inf
-from typing import Generator, Generic, Optional, TypeVar
+from typing import Generator, Generic, Literal, Optional, TypeVar
 
 State = TypeVar("State")
 Action = TypeVar("Action")
@@ -245,3 +245,54 @@ def a_star_bfs_searched_solution(
             raise SearchTimeoutError(f"Could not find solution in {max_steps} steps.")
         else:
             raise NoSolutionError("Tree search problem has no solutions.")
+
+
+AlgoAction = Literal[
+    "initial_state",
+    "state_actions",
+    "state_action_result",
+    "state_action_cost",
+    "is_goal_state",
+    "min_distance",
+]
+
+
+@dataclass
+class AlgoTraceStep(Generic[State, Action]):
+    algo_action: AlgoAction
+    state: State | None = None
+    action: Action | None = None
+
+
+@dataclass
+class TracedPathSearchProblem(PathSearchProblem[State, Action]):
+    """
+    Record the algorithmic steps taken by the path search algorithm for analysis.
+    """
+
+    problem: PathSearchProblem[State, Action]
+    algo_steps: list[AlgoTraceStep[State, Action]] = field(default_factory=list)
+
+    def initial_state(self) -> State:
+        self.algo_steps.append(AlgoTraceStep("initial_state"))
+        return self.problem.initial_state()
+
+    def state_actions(self, state: State) -> list[Action]:
+        self.algo_steps.append(AlgoTraceStep("state_actions", state))
+        return self.problem.state_actions(state)
+
+    def state_action_result(self, state: State, action: Action) -> State:
+        self.algo_steps.append(AlgoTraceStep("state_action_result", state, action))
+        return self.problem.state_action_result(state, action)
+
+    def state_action_cost(self, state: State, action: Action) -> float:
+        self.algo_steps.append(AlgoTraceStep("state_action_cost", state, action))
+        return self.problem.state_action_cost(state, action)
+
+    def is_goal_state(self, state: State) -> bool:
+        self.algo_steps.append(AlgoTraceStep("is_goal_state", state))
+        return self.problem.is_goal_state(state)
+
+    def min_distance(self, state: State) -> float:
+        self.algo_steps.append(AlgoTraceStep("min_distance", state))
+        return self.problem.min_distance(state)

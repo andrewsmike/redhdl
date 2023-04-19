@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from random import seed
 
-from redhdl.bussing import (
-    BussingError,
+from redhdl.bussing import BussingError
+from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
+from redhdl.naive_bussing import (
     PartialBusPaths,
     bussed_placement_schematic,
     bussing_avg_length,
@@ -13,7 +14,6 @@ from redhdl.bussing import (
     dest_pin_relaxed_bus_path,
     interrupted_pin_line_of_sight_count,
 )
-from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
 from redhdl.netlist import InstanceId, Netlist
 from redhdl.netlist_template import (
     InstanceConfig,

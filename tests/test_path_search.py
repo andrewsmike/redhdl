@@ -1,7 +1,7 @@
 from contextlib import ExitStack, contextmanager
 from dataclasses import field, dataclass
 from time import time
-from typing import Literal
+from typing import Generic, Literal
 from unittest.mock import patch
 
 from redhdl.region import Direction, Pos, direction_unit_pos, xz_directions
@@ -9,6 +9,7 @@ from redhdl.path_search import (
     Action,
     PathSearchProblem,
     State,
+    TracedPathSearchProblem,
     a_star_bfs_searched_solution,
     a_star_iddfs_searched_solution,
 )
@@ -159,53 +160,6 @@ def test_iddfs_efficiency():
 
     print(end_time - start_time)
     assert end_time - start_time < 2
-
-
-AlgoAction = Literal[
-    "initial_state",
-    "state_actions",
-    "state_action_result",
-    "state_action_cost",
-    "is_goal_state",
-    "min_distance",
-]
-
-
-@dataclass
-class AlgoStep:
-    algo_action: AlgoAction
-    state: State | None = None
-    action: Action | None = None
-
-
-@dataclass
-class TracedPathSearchProblem(PathSearchProblem[State, Action]):
-    problem: PathSearchProblem[State, Action]
-    algo_steps: list[AlgoStep] = field(default_factory=list)
-
-    def initial_state(self) -> State:
-        self.algo_steps.append(AlgoStep("initial_state"))
-        return self.problem.initial_state()
-
-    def state_actions(self, state: State) -> list[Action]:
-        self.algo_steps.append(AlgoStep("state_actions", state))
-        return self.problem.state_actions(state)
-
-    def state_action_result(self, state: State, action: Action) -> State:
-        self.algo_steps.append(AlgoStep("state_action_result", state, action))
-        return self.problem.state_action_result(state, action)
-
-    def state_action_cost(self, state: State, action: Action) -> float:
-        self.algo_steps.append(AlgoStep("state_action_cost", state, action))
-        return self.problem.state_action_cost(state, action)
-
-    def is_goal_state(self, state: State) -> bool:
-        self.algo_steps.append(AlgoStep("is_goal_state", state))
-        return self.problem.is_goal_state(state)
-
-    def min_distance(self, state: State) -> float:
-        self.algo_steps.append(AlgoStep("min_distance", state))
-        return self.problem.min_distance(state)
 
 
 def steps_2d_map_str(steps: list[Pos]) -> str:
