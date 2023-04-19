@@ -33,7 +33,9 @@ There are multiple conceptual stacks this codebase must build and unify:
 - vHDL parsing and translation into a Netlist.
 
 
-Quick tour, building upwards:
+Quick tour, building upwards
+----------------------------
+
 Generic utilities:
 - slice.py: Provides Slice(), which is slice() but hashable.
 - ascii_dag.py: ASCII-art directed acyclic graph pretty printer.
@@ -61,7 +63,8 @@ Bussing:
     - Has a collision-relaxed solver for searching multiple paths simultaneously.
 - redstone_bussing.py: Experimental fully-featured redstone wire path search problem.
 
-Putting it all together:
+Putting it all together
+-----------------------
 - placement.py: Bussing-naive component placement logic and solvers.
     - Placement definition (A Dict[InstanceId, Tuple[Position, Direction]])
     - (Placement U Netlist) methods (including Schematic generation)
@@ -77,15 +80,19 @@ vHDL stuff:
 WHAT'S MISSING:
 - region.py: Diagonal polyhedra are needed to support diag circuits.
 - instance_template: Support for diagonal circuits.
+
 - redstone_bussing.py:
     - Current representation is insufficiently efficient
         - Optimizing this will be challenging - busses have more state than simple paths.
         - Busses are also _rather_ complicated in their constraints.
         - Might be able to use naive path-finding as a first-pass.
     - No multi-wire / relaxed / herd search.
+
 - assembly.py:
     - Must be improved and adapted to handle real redstone_bussing.
     - Must be adapted to handle hierarchical Netlists (with proper deduplication).
+        - Possibly consider repartitioning using minimum-cut hierarchical clustering or
+            fancy force-based model.
 
 - Schematic library: Must be built out!
 - vhdl: Must get to the point where a hierarchical Netlist can be generated!
