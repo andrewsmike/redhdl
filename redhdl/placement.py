@@ -149,7 +149,7 @@ def source_dest_pin_pos_pairs(
 
 
 def display_placement(netlist: Netlist, placement: InstancePlacement):
-    display_regions(list(placement_region(netlist, placement).subregions))
+    display_regions(*list(placement_region(netlist, placement).subregions))
 
 
 MAX_PLACEMENT_ATTEMPTS = 40

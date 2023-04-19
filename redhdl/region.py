@@ -480,10 +480,24 @@ class Region(metaclass=ABCMeta):
     def intersects(self, other: "Region") -> bool:
         return not (self & other).is_empty()
 
+    def bounding_rect(self) -> "RectangularPrism":
+        return RectangularPrism(
+            min_pos=self.min_pos,
+            max_pos=self.max_pos,
+        )
+
 
 @dataclass(frozen=True)
 class PointRegion(Region):
     points: frozenset[Pos]
+
+    @cached_property
+    def min_pos(self) -> Pos:  # type: ignore
+        return Pos.elem_min(*self.points)
+
+    @cached_property
+    def max_pos(self) -> Pos:  # type: ignore
+        return Pos.elem_max(*self.points)
 
     def shifted(self, offset: Pos) -> Region:
         return PointRegion(frozenset(point + offset for point in self.points))
@@ -990,7 +1004,7 @@ def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
         print(line)
 
 
-def display_regions(regions: list[Region]) -> None:
+def display_regions(*regions: Region) -> None:
     for perspective_axis in ("x", "y", "z"):
-        display_regions_orthographic(regions, cast(Axis, perspective_axis))
+        display_regions_orthographic(list(regions), cast(Axis, perspective_axis))
         print()

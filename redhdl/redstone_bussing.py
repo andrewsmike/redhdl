@@ -7,7 +7,7 @@ Encodes the logic necessary to bus:
 - Using transparent / glass blocks
 - While avoiding hard/soft powering other busses's stuff
 - While avoiding getting hard/soft powered by another bus
-- Compactly AF
+- Compactly
 
 Examples:
 >>> bussing = redstone_bussing(
@@ -25,7 +25,8 @@ RedstoneBussing(element_sig_strengths=frozendict.frozendict({Pos(0, 0, 0): 15, .
                 airspace_blocks=frozenset({Pos(0, 0, 1),
                                            Pos(1, 2, 2),
                                            Pos(1, 1, 1)}))
->>> pprint(bussing.schem())
+>>> schem = bussing.schem()
+>>> pprint(schem)
 Schematic(pos_blocks={Pos(0, -2, 1): Block(block_type='minecraft:gray_wool',
                                            attributes=frozendict.frozendict({})),
                       ...,
@@ -34,6 +35,37 @@ Schematic(pos_blocks={Pos(0, -2, 1): Block(block_type='minecraft:gray_wool',
                       Pos(3, 2, 2): Block(block_type='minecraft:redstone_wire',
                                           attributes=frozendict.frozendict({}))},
           pos_sign_lines={})
+
+>>> from redhdl.schematic import save_schem
+>>> t = save_schem(schem, "/tmp/schem.schem")
+
+>>> from redhdl.region import display_regions
+>>> display_regions(schem.pos_blocks.mask())  # doctest: +NORMALIZE_WHITESPACE
+Y
+<BLANKLINE>
+   1
+   1
+ 111
+ 11
+  1
+     Z
+<BLANKLINE>
+Z
+<BLANKLINE>
+  111
+ 11
+ 1
+      X
+<BLANKLINE>
+Y
+<BLANKLINE>
+   11
+  111
+ 11
+ 11
+ 1
+      X
+<BLANKLINE>
 """
 from dataclasses import dataclass, field
 from functools import reduce
