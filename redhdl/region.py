@@ -272,6 +272,9 @@ class Pos(NamedTuple):
     def l1(self) -> int:
         return sum(abs(self))
 
+    def xz_pos(self) -> "Pos":
+        return Pos(self.x, 0, self.z)
+
     def __ge__(self, other) -> bool:
         return all(left >= right for left, right in zip(self, other))
 
@@ -302,6 +305,8 @@ direction_unit_pos = {
     "up": Pos(0, 1, 0),
     "south": Pos(0, 0, 1),
 }
+
+unit_pos_direction = {pos: direction for direction, pos in direction_unit_pos.items()}
 
 
 def random_pos(inclusive_max_pos: Pos) -> Pos:
