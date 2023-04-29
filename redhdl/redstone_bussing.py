@@ -118,12 +118,8 @@ Y
 ...     schem = bussing.schem()
 ...     # save_schem(schem, f"/tmp/test_bus_{i].schematic")
 ...     # display_regions(schem.pos_blocks.mask())
-Pos(0, 0, 0) Pos(3, 2, 2) 7 ~0.0s
-Pos(0, 0, 0) Pos(0, 4, 3) 7 ~0.1s
-Pos(0, 0, 0) Pos(2, 6, 3) 11 ~0.8s
-Pos(0, 0, 0) Pos(0, 8, 0) 8 ~0.6s
-Pos(0, 0, 0) Pos(8, 0, 0) 8 ~0.0s
-Pos(0, 0, 0) Pos(6, 0, 6) 12 ~0.0s
+Pos(...) ...
+...
 """
 from dataclasses import dataclass, field
 from functools import reduce
@@ -131,8 +127,17 @@ from typing import Any, Literal, NamedTuple, Optional, cast
 
 from frozendict import frozendict
 
-from redhdl.bussing import BussingError
-from redhdl.path_search import PathSearchProblem, a_star_bfs_searched_solution
+from redhdl.bussing import (
+    BussingImpossibleError,
+    BussingLogicError,
+    BussingTimeoutError,
+)
+from redhdl.path_search import (
+    NoSolutionError,
+    PathSearchProblem,
+    SearchTimeoutError,
+    a_star_bfs_searched_solution,
+)
 from redhdl.positional_data import PositionalData
 from redhdl.region import (
     Direction,
@@ -151,8 +156,6 @@ SignalStrength = Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 signal_strengths = cast(list[SignalStrength], list(range(16)))
 
 
-class RedstoneBussingError(BussingError):
-    pass
 
 
 class RedstonePathStep(NamedTuple):
@@ -973,7 +976,9 @@ def redstone_bussing(
     for step in steps:
         state = problem.state_action_result(state, step)
         if state is None:
-            raise RedstoneBussingError("Bus search somehow chose an invalid path.")
+            raise BussingLogicError(
+                "Bus search somehow chose an invalid path. Please report this."
+            )
 
     assert state is not None  # For MyPy.
 
@@ -1003,7 +1008,12 @@ def redstone_bussing_details(
         history_limit=history_limit,
     )
 
-    steps = a_star_bfs_searched_solution(problem, max_steps=max_steps)
+    try:
+        steps = a_star_bfs_searched_solution(problem, max_steps=max_steps)
+    except SearchTimeoutError as e:
+        raise BussingTimeoutError(f"Failed to find A* bus route: {e}")
+    except NoSolutionError:
+        raise BussingImpossibleError(f"No way to bus between {start_pos} and {stop_pos}.")
 
     problem.history_limit = None
 
@@ -1020,7 +1030,9 @@ def redstone_bussing_details(
 
         states.append(state)
         if state is None:
-            raise RedstoneBussingError("Bus search somehow chose an invalid path.")
+            raise BussingLogicError(
+                "Bus search somehow chose an invalid path. Please report this."
+            )
 
     assert state is not None  # For MyPy.
 

@@ -6,12 +6,13 @@ from random import choice
 
 from frozendict import frozendict
 
-from redhdl.bussing import BussingError
+from redhdl.bussing import BussingError, BussingImpossibleError, BussingTimeoutError
 from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
 from redhdl.netlist import Netlist, PinId
 from redhdl.path_search import (
+    NoSolutionError,
     PathSearchProblem,
-    SearchError,
+    SearchTimeoutError,
     a_star_bfs_searched_solution,
 )
 from redhdl.placement import (
@@ -78,8 +79,12 @@ def bus_path(
 
     try:
         return [source_point] + a_star_bfs_searched_solution(problem, max_steps=4_000)
-    except SearchError as e:
-        raise BussingError(str(e))
+    except SearchTimeoutError as e:
+        raise BussingTimeoutError(f"Failed to find A* bus route: {e}")
+    except NoSolutionError:
+        raise BussingImpossibleError(
+            f"No way to bus between {dest_point} and {source_point}."
+        )
 
 
 def first_id_cached(func):
@@ -252,8 +257,12 @@ def relaxed_bus_path(
 
     try:
         return [source_point] + a_star_bfs_searched_solution(problem, max_steps=18_000)
-    except SearchError as e:
-        raise BussingError(str(e))
+    except SearchTimeoutError as e:
+        raise BussingTimeoutError(f"Failed to find A* bus route: {e}")
+    except NoSolutionError:
+        raise BussingImpossibleError(
+            f"No way to bus between {dest_point} and {source_point}."
+        )
 
 
 @first_id_cached
