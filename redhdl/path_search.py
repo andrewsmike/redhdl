@@ -235,8 +235,9 @@ def a_star_bfs_searched_solution(
         explored_states.add(step.state)
 
         for next_step in step.next_steps(problem):
-            if next_step.state not in explored_states:
-                heappush(next_best_action_heap, next_step)
+            # Optional, but slightly slows things down:
+            # if next_step.state not in explored_states
+            heappush(next_best_action_heap, next_step)
 
         remaining_steps -= 1
 
