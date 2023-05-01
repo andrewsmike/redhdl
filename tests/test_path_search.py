@@ -28,9 +28,8 @@ class PlanarPathSearchProblem(PathSearchProblem[Pos, Direction]):
         return [
             direction
             for direction in xz_directions
-            if (
-                    next_pos := state + direction_unit_pos[direction]
-            ) not in self.wall_poses
+            if (next_pos := state + direction_unit_pos[direction])
+            not in self.wall_poses
         ]
 
     def state_action_result(self, state: Pos, action: Direction) -> Pos:
@@ -52,7 +51,9 @@ class PlanarPathSearchProblem(PathSearchProblem[Pos, Direction]):
             current_pos += direction_unit_pos[step_direction]
             solution_positions.add(current_pos)
 
-        all_positions = set(solution_positions) | self.wall_poses | {self.start_pos, self.end_pos}
+        all_positions = (
+            set(solution_positions) | self.wall_poses | {self.start_pos, self.end_pos}
+        )
 
         min_x, _, min_z = Pos.elem_min(*all_positions)
         max_x, _, max_z = Pos.elem_max(*all_positions)
@@ -79,7 +80,6 @@ class PlanarPathSearchProblem(PathSearchProblem[Pos, Direction]):
             lines.append(line)
 
         return "\n".join(lines)
-
 
     def solution_valid(self, solution: list[Action]) -> bool:
         current_pos = self.start_pos
@@ -129,6 +129,7 @@ def planar_path_problem_search_from_map(problem_map: str) -> PlanarPathSearchPro
 
 planar_path_problem = planar_path_problem_search_from_map(problem_map)
 
+
 def test_bfs_search():
     solution = a_star_bfs_searched_solution(planar_path_problem)
     print(planar_path_problem.display_solution_str(solution))
@@ -144,6 +145,7 @@ def test_bfs_efficiency():
 
     print(end_time - start_time)
     assert end_time - start_time < 0.4
+
 
 def test_iddfs_search():
     solution = a_star_bfs_searched_solution(planar_path_problem)
@@ -173,8 +175,7 @@ def steps_2d_map_str(steps: list[Pos]) -> str:
 
     return "\n".join(
         "".join(
-            f"{pos_indices.get(Pos(x, 0, z), -1):3d}"
-            for x in range(min_x, max_x + 1)
+            f"{pos_indices.get(Pos(x, 0, z), -1):3d}" for x in range(min_x, max_x + 1)
         )
         for z in range(min_z, max_z + 1)
     )
@@ -188,8 +189,9 @@ def fully_order_steps():
 
     This is useful for reproducible testing.
     """
+
     def cmp_key(step) -> tuple[float, float, State, Action]:
-        return (step.min_cost, - step.cost, tuple(step.state), step.action)
+        return (step.min_cost, -step.cost, tuple(step.state), step.action)
 
     with ExitStack() as stack:
         for patch_func_name, patch_func in [
@@ -198,9 +200,10 @@ def fully_order_steps():
             ("__le__", lambda self, other: cmp_key(self) <= cmp_key(other)),
             ("__gt__", lambda self, other: cmp_key(self) > cmp_key(other)),
             ("__ge__", lambda self, other: cmp_key(self) >= cmp_key(other)),
-
         ]:
-            stack.enter_context(patch(f"redhdl.path_search.Step.{patch_func_name}", patch_func))
+            stack.enter_context(
+                patch(f"redhdl.path_search.Step.{patch_func_name}", patch_func)
+            )
 
         yield
 
@@ -242,13 +245,15 @@ def display_bfs_expansion_order():
     print(planar_path_problem.display_solution_str(solution))
     print("...")
     print("Expansion order:")
-    print(steps_2d_map_str(
-        [
-            step.state
-            for step in traced_problem.algo_steps
-            if step.algo_action == "state_actions"
-        ]
-    ))
+    print(
+        steps_2d_map_str(
+            [
+                step.state
+                for step in traced_problem.algo_steps
+                if step.algo_action == "state_actions"
+            ]
+        )
+    )
 
 
 @fully_order_steps()
@@ -287,13 +292,15 @@ def display_iddfs_expansion_order():
     print(planar_path_problem.display_solution_str(solution))
     print("...")
     print("Expansion order:")
-    print(steps_2d_map_str(
-        [
-            step.state
-            for step in traced_problem.algo_steps
-            if step.algo_action == "state_actions"
-        ]
-    ))
+    print(
+        steps_2d_map_str(
+            [
+                step.state
+                for step in traced_problem.algo_steps
+                if step.algo_action == "state_actions"
+            ]
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -321,7 +328,7 @@ class BinarySearchProblem(PathSearchProblem[tuple[int], int]):
         if len(state) > len(self.solution):
             return INF
 
-        if self.hard_hint and (self.solution[:len(state)] != state):
+        if self.hard_hint and (self.solution[: len(state)] != state):
             return INF
 
         return max(len(self.solution) - len(state), 1)
@@ -338,17 +345,20 @@ hinting_bsp = BinarySearchProblem(
     hard_hint=False,
 )
 
+
 def test_bsp_problem():
     bfs_solution = a_star_bfs_searched_solution(no_hinting_bsp)
     iddfs_solution = a_star_iddfs_searched_solution(no_hinting_bsp)
     assert bfs_solution == list(bsp_solution)
     assert iddfs_solution == list(bsp_solution)
 
+
 def test_hinting_bsp_problem():
     bfs_solution = a_star_bfs_searched_solution(hinting_bsp)
     iddfs_solution = a_star_iddfs_searched_solution(hinting_bsp)
     assert bfs_solution == list(bsp_solution)
     assert iddfs_solution == list(bsp_solution)
+
 
 def print_benchmarks():
     """
