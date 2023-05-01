@@ -11,28 +11,30 @@ Encodes the logic necessary to bus:
 
 
 ## Ideas
-This version tracks the full history and has a variety of tools.
-This is excellent, but still requires an exponential blowup in depth (even though
-k is low-ish / limited to a small number of momentum changes).
-A future version may use a lightweight stateless pathfinder for initial path discovery,
-then check/verify the result using the state-tracking state/action pair.
+- RIBBONS SHOULD MINIMIZE THEIR EFFECTIVE SPACE USED
 
-things that matter for reducing design space / cardinality:
+This version tracks some amount of history and has a variety of tools.
+History is restricted for the initial search, then unrestricted for a verifying replay.
+
+Things that matter for reducing design space / cardinality:
 - Momentum is incredibly important.
 - Start/end momentum should match the Instance's pins' directions (further reduction)
 
-Additionally, there are other helpful strategies to think about:
-- If you know an area will be crowded, avoid it some
-- If you know an area will be completely empty, maybe don't be the first one in.
+UP NEXT
+- Complete tighter momentum lower bound
+- Just mask all repeater / base / insulation / airspace blocks and have a collision cost for herd routing
+    - Add a congestion cost by x/y/z smearing and counting nearby used blocks
+- Tune avoidance logic to handle airspace / etc (zero cost when zero, collision cost otherwise)
+- If you know an area will be completely empty, maybe don't be the first one in?
 
 There's an ideal density score for each region.
 (Ideally, we'd do some sort of spring-like push/pull model, but for 3d ropes that's...
 complicated.)
 
 Examples:
->>> bussing, states, steps, costs = redstone_bussing_details(
+>>> bussing, states, steps, costs, algo_steps = redstone_bussing_details(
 ...     start_pos=Pos(0, 0, 0),
-...     stop_pos=Pos(3, 2, 2),
+...     end_pos=Pos(3, 2, 2),
 ...     start_xz_dir="south",
 ...     end_xz_dir="east",
 ...     instance_points=set(),
@@ -55,7 +57,7 @@ RedstoneBussing(element_sig_strengths=frozendict.frozendict({Pos(0, 0, 0): 15, .
  RedstonePathStep(next_pos=Pos(3, 2, 2), is_repeater=False, facing=None)]
 
 >>> print(costs)
-[1, 1, 3, 1, 1]
+[1, 1, 4, 1, 1]
 
 >>> schem = bussing.schem()
 >>> pprint(schem)
@@ -101,27 +103,22 @@ Y  [(0, 3)]
 ...     (Pos(0, 0, 0), Pos(0, 8, 0)),
 ...     (Pos(0, 0, 0), Pos(8, 0, 0)),
 ...     (Pos(0, 0, 0), Pos(6, 0, 6)),
+...     (Pos(0, 0, 0), Pos(10, 8, 10)),
 ... ]):
-...     start_time = time()
 ...     bussing = redstone_bussing(
 ...         start_pos=start_pos,
-...         stop_pos=end_pos,
+...         end_pos=end_pos,
 ...         start_xz_dir="south",
 ...         end_xz_dir=None,
 ...         instance_points=set(),
 ...         other_busses=RedstoneBussing(),
 ...         max_steps=10000,
 ...     )
-...     end_time = time()
-...     approx_duration = floor((end_time - start_time) * 10) / 10
-...     print(start_pos, end_pos, (end_pos - start_pos).l1(), f"~{approx_duration}s")
 ...     schem = bussing.schem()
 ...     # save_schem(schem, f"/tmp/test_bus_{i].schematic")
 ...     # display_regions(schem.pos_blocks.mask())
-Pos(...) ...
-...
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import reduce
 from typing import Any, Literal, NamedTuple, Optional, cast
 
@@ -133,16 +130,21 @@ from redhdl.bussing import (
     BussingTimeoutError,
 )
 from redhdl.path_search import (
+    AlgoTraceStep,
     NoSolutionError,
     PathSearchProblem,
     SearchTimeoutError,
+    TracedPathSearchProblem,
     a_star_bfs_searched_solution,
 )
 from redhdl.positional_data import PositionalData
 from redhdl.region import (
+    Axis,
     Direction,
     Pos,
     RectangularPrism,
+    direction_axis_is_pos,
+    direction_by_axis_is_pos,
     direction_unit_pos,
     directions,
     opposite_direction,
@@ -152,10 +154,12 @@ from redhdl.region import (
 )
 from redhdl.schematic import Block, Schematic
 
-SignalStrength = Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-signal_strengths = cast(list[SignalStrength], list(range(16)))
-
-
+# TODO: Replace "repeater" with separate representation of pre-block, post-block, etc, with
+# real signal stregth values (1, 0, and 15 respectively).
+SignalStrength = Literal[
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, "repeater"
+]
+signal_strengths = cast(list[SignalStrength], list(range(16))) + ["repeater"]
 
 
 class RedstonePathStep(NamedTuple):
@@ -549,17 +553,26 @@ class RedstoneBussing:
                 return None
 
         if step.is_repeater:
-            next_sig_strength = 15
+            next_sig_strength: SignalStrength = "repeater"
         else:
-            next_sig_strength = self.element_sig_strengths[prev_pos] - 1
+            prev_sig_strength = self.element_sig_strengths[prev_pos]
+            if prev_sig_strength == "repeater":
+                next_sig_strength = 15
+            else:
+                next_sig_strength = cast(SignalStrength, prev_sig_strength - 1)
 
         # [CONNECTIVITY 1] Wires don't run out of signal strength.
         if next_sig_strength == 0:
             return None
 
         if step.is_repeater:
-            repeater_directions = self.repeater_directions.set(  # type: ignore
-                step.next_pos, step.facing
+            assert step.facing is not None  # For MyPy.
+
+            repeater_directions = frozendict(
+                list(self.repeater_directions.items())
+                + [
+                    (step.next_pos, step.facing),
+                ],
             )
         else:
             repeater_directions = self.repeater_directions
@@ -613,8 +626,9 @@ class RedstoneBussing:
             return None
 
         return RedstoneBussing(
-            element_sig_strengths=self.element_sig_strengths.set(  # type: ignore
-                step.next_pos, next_sig_strength
+            element_sig_strengths=frozendict(
+                list(self.element_sig_strengths.items())
+                + [(step.next_pos, next_sig_strength)]  # type: ignore
             ),
             repeater_directions=repeater_directions,
             spacer_blocks=spacer_blocks,
@@ -624,28 +638,25 @@ class RedstoneBussing:
     def with_truncated_history(
         self,
         current_pos: Pos,
+        previous_pos: Pos,
         max_blocks_away: int = 1,
     ) -> "RedstoneBussing":
         return RedstoneBussing(
             element_sig_strengths=frozendict(
                 (pos, sig_strength)
                 for pos, sig_strength in self.element_sig_strengths.items()
-                if max(abs(current_pos - pos)) <= max_blocks_away
+                if pos == current_pos or pos == previous_pos
             ),
             repeater_directions=frozendict(
                 (pos, dir)
                 for pos, dir in self.repeater_directions.items()
-                if max(abs(current_pos - pos)) <= max_blocks_away
+                if current_pos == pos
             ),
             spacer_blocks=frozenset(
-                pos
-                for pos in self.spacer_blocks
-                if max(abs(current_pos - pos)) <= max_blocks_away
+                pos for pos in self.spacer_blocks if current_pos == pos
             ),
             airspace_blocks=frozenset(
-                pos
-                for pos in self.airspace_blocks
-                if max(abs(current_pos - pos)) <= max_blocks_away
+                pos for pos in self.airspace_blocks if current_pos == pos
             ),
         )
 
@@ -657,15 +668,16 @@ BusYDirection = Literal["straight_up", "slant_up", "any_up", "flat", "slant_down
 
 
 momentum_expected_step_poses: dict[
-    tuple[XZDirection | None, BusYDirection | None], set[Pos]
+    tuple[XZDirection | None, BusYDirection | None, bool], set[Pos]
 ] = (
     {  # When xz is known, and y may be unknown.
         xz_y_dir: poses
         for xz_direction in xz_directions
+        for is_repeater in [True, False]
         for xz_y_dir, poses in cast(
-            dict[tuple[XZDirection, BusYDirection | None], set[Pos]],
+            dict[tuple[XZDirection, BusYDirection | None, bool], set[Pos]],
             {
-                (xz_direction, None): {
+                (xz_direction, None, is_repeater): {
                     # Allowing busses to start as if they're the end of a straight_up
                     # (IE stepping up in the exact opposite direction) is really
                     # surprising when it happens. Don't incentivize this case.
@@ -674,28 +686,36 @@ momentum_expected_step_poses: dict[
                     direction_unit_pos[xz_direction] + Pos(0, 0, 0),
                     direction_unit_pos[xz_direction] + Pos(0, -1, 0),
                 },
-                (xz_direction, "any_up"): {
+                (xz_direction, "any_up", is_repeater): {
                     direction_unit_pos[opposite_direction[xz_direction]] + Pos(0, 1, 0),
                     direction_unit_pos[xz_direction] + Pos(0, 1, 0),
-                },
-                (xz_direction, "straight_up"): {
+                }
+                | ({direction_unit_pos[xz_direction]} if is_repeater else set()),
+                (xz_direction, "straight_up", is_repeater): {
                     direction_unit_pos[opposite_direction[xz_direction]] + Pos(0, 1, 0)
-                },
-                (xz_direction, "slant_up"): {
+                }
+                | ({direction_unit_pos[xz_direction]} if is_repeater else set()),
+                (xz_direction, "slant_up", is_repeater): {
                     direction_unit_pos[xz_direction] + Pos(0, 1, 0)
-                },
-                (xz_direction, "flat"): {direction_unit_pos[xz_direction]},
-                (xz_direction, "slant_down"): {
+                }
+                | ({direction_unit_pos[xz_direction]} if is_repeater else set()),
+                (xz_direction, "flat", is_repeater): {direction_unit_pos[xz_direction]},
+                (xz_direction, "slant_down", is_repeater): {
                     direction_unit_pos[xz_direction] + Pos(0, -1, 0)
                 },
             },
         ).items()
     }
     | {  # When xz is unknown, and y is known.
-        (None, y_dir): {
+        (None, y_dir, is_repeater): {
             y_offset + direction_unit_pos[xz_direction]
             for xz_direction in xz_directions
         }
+        | (
+            {direction_unit_pos[xz_direction] for xz_direction in xz_directions}
+            if is_repeater
+            else set()
+        )
         for y_dir, y_offset in cast(
             dict[BusYDirection, Pos],
             {
@@ -706,13 +726,15 @@ momentum_expected_step_poses: dict[
                 "slant_down": Pos(0, -1, 0),
             },
         ).items()
+        for is_repeater in [False, True]
     }
     | {  # When neither xz nor y are known.
-        (None, None): {
+        (None, None, is_repeater): {
             y_offset + direction_unit_pos[xz_direction]
             for xz_direction in xz_directions
             for y_offset in [Pos(0, -1, 0), Pos(0, 0, 0), Pos(0, 1, 0)]
         }
+        for is_repeater in (True, False)
     }
 )
 
@@ -734,7 +756,7 @@ def _next_momentum_xy_z_and_momentum_broken(
     state: PartialBus,
     action: RedstonePathStep,
     debug: bool = False,
-) -> tuple[XZDirection, BusYDirection, bool]:
+) -> tuple[XZDirection, BusYDirection | None, bool]:
     step = action.next_pos - state.current_position
     step_xz_dir = cast(XZDirection, unit_pos_direction[step.xz_pos()])
 
@@ -751,14 +773,14 @@ def _next_momentum_xy_z_and_momentum_broken(
     momentum_broken = (
         step
         not in momentum_expected_step_poses[
-            (state.momentum_xz_dir, state.momentum_y_dir)
+            (state.momentum_xz_dir, state.momentum_y_dir, action.is_repeater)
         ]
     )
 
     momentum_xz_dir = step_xz_dir
 
     if momentum_broken:  # When beginning / resetting
-        momentum_y_dir: BusYDirection = step_y_dir
+        momentum_y_dir: BusYDirection | None = step_y_dir
     else:  # When continuing a straight line
         if step_y_dir == "any_up":
             if (  # No inference necessary; just copy.
@@ -773,9 +795,15 @@ def _next_momentum_xy_z_and_momentum_broken(
                 else:
                     momentum_y_dir = "straight_up"
         else:
-            momentum_y_dir = step_y_dir
+            if action.is_repeater:
+                momentum_y_dir = state.momentum_y_dir
+            else:
+                momentum_y_dir = step_y_dir
 
     if debug:
+        print(
+            "pos, step xz/y momentums, step_y_dir, prev xz/y momentum, repeater, broken:"
+        )
         print(
             (
                 step,
@@ -783,11 +811,86 @@ def _next_momentum_xy_z_and_momentum_broken(
                 step_y_dir,
                 state.momentum_xz_dir,
                 state.momentum_y_dir,
+                action.is_repeater,
                 momentum_broken,
             )
         )
 
     return momentum_xz_dir, momentum_y_dir, momentum_broken
+
+
+def _min_xz_turns(
+    distance_vector: Pos,
+    start_xz_momentum: XZDirection | None,
+    end_xz_momentum: XZDirection | None,
+    debug: bool = False,
+):
+    """
+    Minimum turns (momentum breaks) calculation for the X/Z axes:
+
+    - If start == end:
+        min_turns == 0
+
+    - ElIf the starting and finishing position are colinear in X or Z:
+        - One turn per endpoint that's not _directly_ pointing the right way.
+
+    - Else if the starting and finishing positions aren't colinear, one turn, then:
+        - If they both point exactly along the same axis, that'll require two turns. Plus one turn.
+        - Else they don't point the same way:
+            - If the starting position points directly away from the finish, that'll take a turn to correct. Plus one turn.
+            - If the finishing position points directly away from the start, that'll take a turn to correct. Plus one turn.
+    >>> _min_xz_turns(Pos(5, 5, 5), start_xz_momentum=None, end_xz_momentum=None)
+    1
+    """
+
+    if distance_vector.xz_pos() == zero_pos:  # Same point.
+        return 0
+
+    elif distance_vector.x == 0 or distance_vector.z == 0:  # Colinear.
+        if distance_vector.x != 0:
+            axis: Axis = "x"
+            is_pos = distance_vector.x > 0
+        else:
+            axis = "z"
+            is_pos = distance_vector.z > 0
+
+        required_direction = direction_by_axis_is_pos[(axis, is_pos)]
+
+        return int(
+            start_xz_momentum is not None and (start_xz_momentum != required_direction)
+        ) + int(end_xz_momentum is not None and (end_xz_momentum != required_direction))
+
+    # Remaining case: not colinear.
+
+    # Pointing same way == double bend S shape.
+    if start_xz_momentum == end_xz_momentum and start_xz_momentum is not None:
+        return 2
+
+    axis_delta = dict(zip("xyz", distance_vector))
+
+    min_turns = 1
+
+    # If the starting position points directly away from the finish, that'll take a turn to correct. Plus one turn.
+    if start_xz_momentum is not None:
+        axis, is_pos = direction_axis_is_pos[start_xz_momentum]
+        if (axis_delta[axis] > 0) != is_pos:
+            min_turns += 1
+
+    # If the finishing position points directly away from the start, that'll take a turn to correct. Plus one turn.
+    if end_xz_momentum is not None:
+        axis, is_pos = direction_axis_is_pos[end_xz_momentum]
+        if (axis_delta[axis] > 0) != is_pos:
+            min_turns += 1
+
+    return min_turns
+
+
+def _min_y_turns(
+    distance_vector: Pos,
+    start_y_momentum: BusYDirection | None,
+):
+    # TODO. Implementing this would speed up search, but not implementing it does not affect correctness.
+    return 0
 
 
 @dataclass
@@ -822,7 +925,7 @@ class RedstonePathFindingProblem(
     """
 
     start_pos: Pos
-    stop_pos: Pos
+    end_pos: Pos
 
     start_xz_dir: XZDirection | None
     end_xz_dir: XZDirection | None
@@ -830,7 +933,7 @@ class RedstonePathFindingProblem(
     instance_points: set[Pos]
     other_busses: "RedstoneBussing"
 
-    repeater_cost: int
+    early_repeater_cost: int
     momentum_break_cost: int
 
     # For efficient searching, truncate path history.
@@ -889,6 +992,7 @@ class RedstonePathFindingProblem(
             if self.history_limit is not None:
                 next_bussing = next_bussing.with_truncated_history(
                     current_pos=action.next_pos,
+                    previous_pos=state.current_position,
                     max_blocks_away=self.history_limit,
                 )
 
@@ -906,28 +1010,39 @@ class RedstonePathFindingProblem(
     ) -> float:
         if state is None:
             return 0
-        elif state.current_position in state.current_bussing.repeater_directions:
-            return self.repeater_cost
-        else:
-            (
-                momentum_xz_dir,
-                _,
-                momentum_broken,
-            ) = _next_momentum_xy_z_and_momentum_broken(state, action, debug=self.debug)
-            momentum_didnt_match_at_stop_pos = (
-                action.next_pos == self.stop_pos
-                and self.end_xz_dir is not None
-                and self.end_xz_dir != momentum_xz_dir
-            )
-            if momentum_broken or momentum_didnt_match_at_stop_pos:
-                return self.momentum_break_cost
-            else:
-                return 1
+
+        cost = 1
+        if action.is_repeater:
+            sig_strength = state.current_bussing.element_sig_strengths[
+                state.current_position
+            ]
+            if sig_strength == "repeater" or sig_strength > 1:
+                if self.debug:
+                    print("EARLY REPEATER")
+                cost += self.early_repeater_cost
+
+        (
+            momentum_xz_dir,
+            _,
+            momentum_broken,
+        ) = _next_momentum_xy_z_and_momentum_broken(state, action, debug=self.debug)
+
+        momentum_didnt_match_at_end_pos = (
+            action.next_pos == self.end_pos
+            and self.end_xz_dir is not None
+            and self.end_xz_dir != momentum_xz_dir
+        )
+        if momentum_broken or momentum_didnt_match_at_end_pos:
+            if self.debug:
+                print("MOMENTUM BROKEN")
+            cost += self.momentum_break_cost
+
+        return cost
 
     def is_goal_state(self, state: PartialBus | None) -> bool:
         return (
             state is not None
-            and state.current_position == self.stop_pos
+            and state.current_position == self.end_pos
             and state.current_position not in state.current_bussing.repeater_directions
         )
 
@@ -935,20 +1050,44 @@ class RedstonePathFindingProblem(
         if state is None:
             return 10000
 
-        distance_vector = state.current_position - self.stop_pos
+        distance_vector = self.end_pos - state.current_position
 
-        y_distance = distance_vector.y
-        xz_distance = Pos(distance_vector.x, 0, distance_vector.z).l1()
+        # For every 16 in height, we have to take an extra step for the repeater.
+        y_distance = abs(distance_vector.y) + abs(distance_vector.y) // 16
+        xz_distance = distance_vector.xz_pos().l1()
 
         # How many redstone steps are necessary to get there?
         min_steps = max(xz_distance, y_distance)
 
-        return (self.repeater_cost * min_steps // 16) + min_steps
+        min_turns_xz = _min_xz_turns(
+            distance_vector,
+            start_xz_momentum=state.momentum_xz_dir,
+            end_xz_momentum=self.end_xz_dir,
+            debug=self.debug,
+        )
+
+        min_turns_y = _min_y_turns(
+            distance_vector,
+            start_y_momentum=state.momentum_y_dir,
+        )
+
+        min_momentum_breaks = max(min_turns_xz, min_turns_y)
+
+        if self.debug:
+            print(
+                "xzdist, ydist, min xz turns, min y turns:",
+                xz_distance,
+                y_distance,
+                min_turns_xz,
+                min_turns_y,
+            )
+
+        return min_steps + min_momentum_breaks * self.momentum_break_cost
 
 
 def redstone_bussing(
     start_pos: Pos,
-    stop_pos: Pos,
+    end_pos: Pos,
     start_xz_dir: XZDirection | None,
     end_xz_dir: XZDirection | None,
     instance_points: set[Pos],
@@ -958,21 +1097,21 @@ def redstone_bussing(
 ) -> RedstoneBussing:
     problem = RedstonePathFindingProblem(
         start_pos=start_pos,
-        stop_pos=stop_pos,
+        end_pos=end_pos,
         start_xz_dir=start_xz_dir,
         end_xz_dir=end_xz_dir,
         instance_points=set(),
         other_busses=RedstoneBussing(),
-        repeater_cost=12,
+        early_repeater_cost=12,
         momentum_break_cost=3,
         history_limit=history_limit,
     )
 
     steps = a_star_bfs_searched_solution(problem, max_steps=max_steps)
 
-    problem.history_limit = None
+    problem = replace(problem, history_limit=None)
 
-    state: Optional[PartialBus] = problem.initial_state()
+    state: PartialBus | None = problem.initial_state()
     for step in steps:
         state = problem.state_action_result(state, step)
         if state is None:
@@ -987,7 +1126,7 @@ def redstone_bussing(
 
 def redstone_bussing_details(
     start_pos: Pos,
-    stop_pos: Pos,
+    end_pos: Pos,
     start_xz_dir: XZDirection | None,
     end_xz_dir: XZDirection | None,
     instance_points: set[Pos],
@@ -995,32 +1134,39 @@ def redstone_bussing_details(
     max_steps: int,
     history_limit: int | None = 1,
     debug: bool = False,
-) -> tuple[RedstoneBussing, list[PartialBus], list[RedstonePathStep], list[float]]:
-    problem = RedstonePathFindingProblem(
+) -> tuple[
+    RedstoneBussing,
+    list[PartialBus],
+    list[RedstonePathStep],
+    list[float],
+    list[AlgoTraceStep[PartialBus | None, RedstonePathStep]],
+]:
+    base_problem = RedstonePathFindingProblem(
         start_pos=start_pos,
-        stop_pos=stop_pos,
+        end_pos=end_pos,
         start_xz_dir=start_xz_dir,
         end_xz_dir=end_xz_dir,
         instance_points=set(),
         other_busses=RedstoneBussing(),
-        repeater_cost=12,
+        early_repeater_cost=12,
         momentum_break_cost=3,
         history_limit=history_limit,
     )
+    traced_problem = TracedPathSearchProblem(base_problem)
 
     try:
-        steps = a_star_bfs_searched_solution(problem, max_steps=max_steps)
+        steps = a_star_bfs_searched_solution(traced_problem, max_steps=max_steps)
     except SearchTimeoutError as e:
         raise BussingTimeoutError(f"Failed to find A* bus route: {e}")
     except NoSolutionError:
-        raise BussingImpossibleError(f"No way to bus between {start_pos} and {stop_pos}.")
+        raise BussingImpossibleError(
+            f"No way to bus between {start_pos} and {end_pos}."
+        )
 
-    problem.history_limit = None
+    problem = replace(base_problem, history_limit=None, debug=debug)
 
     states: list[PartialBus | None] = []
     step_costs: list[float] = []
-
-    problem.debug = debug
 
     state: PartialBus | None = problem.initial_state()
     states.append(state)
