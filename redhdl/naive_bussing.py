@@ -62,7 +62,7 @@ class PathFindingProblem(PathSearchProblem[Pos, Pos]):
     def is_goal_state(self, state: Pos) -> bool:
         return state == self.stop_point
 
-    def min_distance(self, state: Pos) -> float:
+    def min_cost(self, state: Pos) -> float:
         return (state - self.stop_point).l1()
 
 
@@ -236,7 +236,7 @@ class RelaxedPathFindingProblem(PathSearchProblem[Pos, Pos]):
     def is_goal_state(self, state: Pos) -> bool:
         return state == self.stop_point
 
-    def min_distance(self, state: Pos) -> float:
+    def min_cost(self, state: Pos) -> float:
         return (state - self.stop_point).l1()
 
 

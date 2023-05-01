@@ -55,7 +55,10 @@ class PathSearchProblem(Generic[State, Action], metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def min_distance(self, state: State) -> float:
+    def min_cost(self, state: State) -> float:
+        pass
+
+    def expanding_step(self, step: "Step") -> None:
         pass
 
 
@@ -86,7 +89,7 @@ class Step(Generic[State, Action]):
                     next_cost := self.cost
                     + problem.state_action_cost(self.state, action)
                 ),
-                min_cost=next_cost + problem.min_distance(next_state),
+                min_cost=next_cost + problem.min_cost(next_state),
             )
 
     @staticmethod
@@ -234,6 +237,7 @@ def a_star_bfs_searched_solution(
 
         explored_states.add(step.state)
 
+        problem.expanding_step(step)  # Just for debugging.
         for next_step in step.next_steps(problem):
             # Optional, but slightly slows things down:
             # if next_step.state not in explored_states
@@ -254,7 +258,8 @@ AlgoAction = Literal[
     "state_action_result",
     "state_action_cost",
     "is_goal_state",
-    "min_distance",
+    "min_cost",
+    "expanding_step",
 ]
 
 
@@ -263,6 +268,7 @@ class AlgoTraceStep(Generic[State, Action]):
     algo_action: AlgoAction
     state: State | None = None
     action: Action | None = None
+    step: Step | None = None
 
 
 @dataclass
@@ -294,6 +300,11 @@ class TracedPathSearchProblem(PathSearchProblem[State, Action]):
         self.algo_steps.append(AlgoTraceStep("is_goal_state", state))
         return self.problem.is_goal_state(state)
 
-    def min_distance(self, state: State) -> float:
-        self.algo_steps.append(AlgoTraceStep("min_distance", state))
-        return self.problem.min_distance(state)
+    def min_cost(self, state: State) -> float:
+        self.algo_steps.append(AlgoTraceStep("min_cost", state))
+        return self.problem.min_cost(state)
+
+    def expanding_step(self, step: Step) -> None:
+        self.algo_steps.append(
+            AlgoTraceStep("expanding_step", step.state, step.action, step)
+        )

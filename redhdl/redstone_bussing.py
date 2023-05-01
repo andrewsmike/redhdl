@@ -931,7 +931,7 @@ class RedstonePathFindingProblem(
             and state.current_position not in state.current_bussing.repeater_directions
         )
 
-    def min_distance(self, state: PartialBus | None) -> float:
+    def min_cost(self, state: PartialBus | None) -> float:
         if state is None:
             return 10000
 
@@ -1043,4 +1043,5 @@ def redstone_bussing_details(
         cast(list[PartialBus], states),
         steps,
         step_costs,
+        traced_problem.algo_steps,
     )

@@ -42,7 +42,7 @@ class PlanarPathSearchProblem(PathSearchProblem[Pos, Direction]):
     def is_goal_state(self, state: Pos) -> bool:
         return state == self.end_pos
 
-    def min_distance(self, state: Pos) -> float:
+    def min_cost(self, state: Pos) -> float:
         return (state - self.end_pos).l1()
 
     def display_solution_str(self, solution: list[Direction]):
@@ -316,7 +316,7 @@ class BinarySearchProblem(PathSearchProblem[tuple[int], int]):
     def is_goal_state(self, state: tuple[int]) -> bool:
         return state == self.solution
 
-    def min_distance(self, state: tuple[int]) -> float:
+    def min_cost(self, state: tuple[int]) -> float:
         INF = 1000000000
         if len(state) > len(self.solution):
             return INF
