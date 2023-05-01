@@ -909,7 +909,7 @@ def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
     ...     ],
     ...     axis="x",
     ... )
-    Y
+    Y  [(0, 10), (20, 28)]
                  .
                  . 333333333
                  . 333333333
@@ -930,7 +930,7 @@ def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
      11111 22222 .
      11111 22222 .
            22222 .
-                 .           Z
+                 .           Z  [(-1, 8), (15, 20)]
     """
     axis_names = partial_coord(("X", "Y", "Z"), axes.index(axis))
 
@@ -982,7 +982,7 @@ def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
             result_lines.append("." * total_width)
 
         if y_index == 0:
-            result_lines.append(spacing_line + axis_names[0])
+            result_lines.append(spacing_line + f"{axis_names[0]}  {y_filled_ranges}")
         else:
             result_lines.append(spacing_line)
 
@@ -1003,7 +1003,7 @@ def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
 
         result_lines.append(spacing_line)
 
-    result_lines.append(axis_names[1])
+    result_lines.append(axis_names[1] + f"  {x_filled_ranges}")
 
     for line in reversed(result_lines):
         print(line)

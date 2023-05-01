@@ -73,23 +73,23 @@ Schematic(pos_blocks={Pos(0, -1, 0): Block(block_type='minecraft:gray_wool',
 The minimal bus has a traverse element, and an ascend element:
 >>> from redhdl.region import display_regions
 >>> display_regions(schem.pos_blocks.mask())  # doctest: +NORMALIZE_WHITESPACE
-Y
+Y  [(0, 2)]
    1
   11
  11
  1
-     Z
-Z
+     Z  [(-1, 2)]
+Z  [(0, 3)]
  1111
  1
  1
-      X
-Y
+      X  [(0, 2)]
+Y  [(0, 3)]
  1111
  1111
  1
  1
-      X
+      X  [(-1, 2)]
 
 >>> from math import floor
 >>> from time import time
