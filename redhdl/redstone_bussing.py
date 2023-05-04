@@ -62,12 +62,12 @@ RedstoneBussing(element_sig_strengths=frozendict.frozendict({Pos(0, 0, 0): 15, .
 
 >>> schem = bussing.schem()
 >>> pprint(schem)
-Schematic(pos_blocks={Pos(0, -1, 0): Block(block_type='minecraft:gray_wool',
+Schematic(pos_blocks={Pos(0, -1, 0): Block(block_type='minecraft:..._wool',
                                            attributes=frozendict.frozendict({})),
                       Pos(0, 0, 0): Block(block_type='minecraft:redstone_wire',
                                           attributes=frozendict.frozendict({})),
 ...
-                      Pos(3, 1, 2): Block(block_type='minecraft:gray_wool',
+                      Pos(3, 1, 2): Block(block_type='minecraft:..._wool',
                                           attributes=frozendict.frozendict({})),
                       Pos(3, 2, 2): Block(block_type='minecraft:redstone_wire',
                                           attributes=frozendict.frozendict({}))},
@@ -121,6 +121,7 @@ Y  [(0, 3)]
 """
 from dataclasses import dataclass, field, replace
 from functools import reduce
+from random import choice
 from typing import Any, Literal, NamedTuple, Optional, cast
 
 from frozendict import frozendict
@@ -217,6 +218,26 @@ class RedstonePathStep(NamedTuple):
         ]
 
         return place_wire_steps + place_repeater_steps
+
+
+_colors = [
+    "white",
+    "orange",
+    "magenta",
+    "light_blue",
+    "yellow",
+    "lime",
+    "pink",
+    "gray",
+    "silver",
+    "cyan",
+    "purple",
+    "blue",
+    "brown",
+    "green",
+    "red",
+    "black",
+]
 
 
 @dataclass(frozen=True)
@@ -378,6 +399,7 @@ class RedstoneBussing:
         self,
         pos: Pos,
         other_bus_airspace_blocks: set[Pos] | frozenset[Pos],
+        color: str | None = None,
     ) -> Block:
         if pos in self.element_sig_strengths:
             if pos in self.repeater_directions:
@@ -406,7 +428,12 @@ class RedstoneBussing:
             )
 
         if pos in self.transparent_foundation_blocks(other_bus_airspace_blocks):
-            block_type = "minecraft:glass"
+            if color is not None:
+                block_type = f"minecraft:{color}_stained_glass"
+            else:
+                block_type = "minecraft:glass"
+        elif color is not None:
+            block_type = f"minecraft:{color}_wool"
         elif pos in self.hard_powered_blocks:
             block_type = "minecraft:black_wool"
         elif pos in self.soft_powered_blocks:
@@ -423,17 +450,20 @@ class RedstoneBussing:
         self,
         # Other busses' airspaces determine which base blocks are transparent.
         other_bus_airspace_blocks: set[Pos] | frozenset[Pos],
+        color: str | None,
     ) -> PositionalData[Block]:
         return PositionalData(
             (pos, block)
             for pos in RectangularPrism(self.min_pos, self.max_pos)
-            if (block := self.pos_block(pos, other_bus_airspace_blocks)).block_type
+            if (
+                block := self.pos_block(pos, other_bus_airspace_blocks, color=color)
+            ).block_type
             != "minecraft:air"
         )
 
     def schem(self) -> Schematic:
         return Schematic(
-            pos_blocks=self.pos_blocks(set()),
+            pos_blocks=self.pos_blocks(set(), color=choice(_colors)),
             pos_sign_lines=PositionalData(),
         )
 
