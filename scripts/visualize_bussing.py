@@ -89,7 +89,7 @@ def main():
         start_xz_dir=start_xz_dir,
         end_xz_dir=end_xz_dir,
         instance_points=set(),
-        other_busses=RedstoneBussing(),
+        other_buses=RedstoneBussing(),
         max_steps=10000,
         debug=False,
     )
@@ -110,7 +110,7 @@ def main():
         start_xz_dir=start_xz_dir,
         end_xz_dir=end_xz_dir,
         instance_points=set(),
-        other_busses=RedstoneBussing(),
+        other_buses=RedstoneBussing(),
         early_repeater_cost=12,
         momentum_break_cost=3,
         debug=True,

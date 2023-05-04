@@ -11,6 +11,7 @@ Encodes the logic necessary to bus:
 
 
 ## Ideas
+- Surround instances and busses with a "nearby" zone that's preferable for wires.
 - RIBBONS SHOULD MINIMIZE THEIR EFFECTIVE SPACE USED
 
 This version tracks some amount of history and has a variety of tools.
@@ -38,7 +39,7 @@ Examples:
 ...     start_xz_dir="south",
 ...     end_xz_dir="east",
 ...     instance_points=set(),
-...     other_busses=RedstoneBussing(),
+...     other_buses=RedstoneBussing(),
 ...     max_steps=10000,
 ...     debug=False,
 ... )
@@ -111,7 +112,7 @@ Y  [(0, 3)]
 ...         start_xz_dir="south",
 ...         end_xz_dir=None,
 ...         instance_points=set(),
-...         other_busses=RedstoneBussing(),
+...         other_buses=RedstoneBussing(),
 ...         max_steps=10000,
 ...     )
 ...     schem = bussing.schem()
@@ -385,7 +386,7 @@ class RedstoneBussing:
                     attributes=frozendict(
                         {
                             "delay": "1",
-                            "facing": self.repeater_directions[pos],
+                            "facing": opposite_direction[self.repeater_directions[pos]],
                             "locked": "false",
                             "powered": "false",
                         }
@@ -445,7 +446,7 @@ class RedstoneBussing:
 
     def add_step(
         self,
-        other_busses: "RedstoneBussing",
+        other_buses: "RedstoneBussing",
         prev_pos: Pos,
         step: RedstonePathStep,
     ) -> Optional["RedstoneBussing"]:
@@ -502,8 +503,8 @@ class RedstoneBussing:
         #     wire/repeater blocks.
         placement_blocks = {step.next_pos, below_block}
         preexisting_placement_blocks = (
-            other_busses.element_blocks
-            | other_busses.element_foundation_blocks
+            other_buses.element_blocks
+            | other_buses.element_foundation_blocks
             | self.element_blocks
             | self.element_foundation_blocks
         )
@@ -513,21 +514,34 @@ class RedstoneBussing:
         if step.is_wire:
             # [INPUT NOISE 1] Wire is not adjacent to another wire. [PART 1, dy=0]
             any_adjacent_wires = any(
-                neighbor in other_busses.wire_blocks for neighbor in xz_neighbor_blocks
+                (
+                    (neighbor := xz_neighbor + Pos(0, dy, 0)) in other_buses.wire_blocks
+                    and (
+                        dy != -1
+                        or (neighbor + Pos(0, 1, 0)) not in other_buses.spacer_blocks
+                    )
+                    and (
+                        dy != 1
+                        or (step.next_pos + Pos(0, 1, 0))
+                        not in other_buses.spacer_blocks
+                    )
+                )
+                for xz_neighbor in xz_neighbor_blocks
+                for dy in [-1, 0, 1]
             )
             # [INPUT NOISE 2] Wire is not adjacent to a hard-powered block.
             any_adjacent_hard_powered_blocks = any(
-                neighbor in other_busses.hard_powered_blocks
+                neighbor in other_buses.hard_powered_blocks
                 for neighbor in neighbor_blocks
             )
 
             # [OUTPUT NOISE 1] Wire does not soft-power a soft-power-sensitive block.
             any_adjacent_soft_power_sensitive_blocks = (
                 any(
-                    neighbor in other_busses.soft_power_sensitive_blocks
+                    neighbor in other_buses.soft_power_sensitive_blocks
                     for neighbor in xz_neighbor_blocks
                 )
-                or below_block in other_busses.soft_power_sensitive_blocks
+                or below_block in other_buses.soft_power_sensitive_blocks
             )
 
             if (
@@ -542,12 +556,12 @@ class RedstoneBussing:
             # [INPUT NOISE 3] Repeater input block isn't soft-powered or hard-powered by other busses.
             has_noisy_input = (
                 step.next_pos + direction_unit_pos[opposite_direction[step.facing]]
-            ) in other_busses.soft_powered_blocks
+            ) in other_buses.soft_powered_blocks
 
             # [OUTPUT NOISE 2] Repeater does not hard-power a hard-power-sensitive block.
             output_affects_others = (
                 step.next_pos + direction_unit_pos[step.facing]
-            ) in other_busses.hard_power_sensitive_blocks
+            ) in other_buses.hard_power_sensitive_blocks
 
             if has_noisy_input or output_affects_others:
                 return None
@@ -586,7 +600,7 @@ class RedstoneBussing:
         # [INPUT NOISE 1] Wire is not adjacent to another wire. [PART 2, dy != 0]
         if step.is_wire:
             if any(
-                (neighbor + direction_unit_pos["up"]) in other_busses.wire_blocks
+                (neighbor + direction_unit_pos["up"]) in other_buses.wire_blocks
                 for neighbor in xz_neighbor_blocks
             ):
                 new_spacer_blocks.add(step.next_pos + direction_unit_pos["up"])
@@ -596,7 +610,7 @@ class RedstoneBussing:
                 for neighbor_block in xz_neighbor_blocks
                 if (
                     (neighbor_block + direction_unit_pos["down"])
-                    in other_busses.wire_blocks
+                    in other_buses.wire_blocks
                 )
             )
 
@@ -618,8 +632,8 @@ class RedstoneBussing:
         # [COLLISION 3] New airspace blocks don't conflict with old solid foundation or spacer blocks.
         if (
             len(
-                (other_busses.foundation_blocks | other_busses.spacer_blocks)
-                & (new_airspace_blocks - other_busses.airspace_blocks)
+                (other_buses.foundation_blocks | other_buses.spacer_blocks)
+                & (new_airspace_blocks - other_buses.airspace_blocks)
             )
             != 0
         ):
@@ -931,7 +945,7 @@ class RedstonePathFindingProblem(
     end_xz_dir: XZDirection | None
 
     instance_points: set[Pos]
-    other_busses: "RedstoneBussing"
+    other_buses: "RedstoneBussing"
 
     early_repeater_cost: int
     momentum_break_cost: int
@@ -961,7 +975,7 @@ class RedstonePathFindingProblem(
                 transparent_foundation=(
                     state.current_position
                     in state.current_bussing.transparent_foundation_blocks(
-                        self.other_busses.airspace_blocks
+                        self.other_buses.airspace_blocks
                     )
                 ),
             )
@@ -981,7 +995,7 @@ class RedstonePathFindingProblem(
             ) = _next_momentum_xy_z_and_momentum_broken(state, action)
 
             next_bussing = state.current_bussing.add_step(
-                self.other_busses,
+                self.other_buses,
                 prev_pos=state.current_position,
                 step=action,
             )
@@ -1091,7 +1105,7 @@ def redstone_bussing(
     start_xz_dir: XZDirection | None,
     end_xz_dir: XZDirection | None,
     instance_points: set[Pos],
-    other_busses: RedstoneBussing,
+    other_buses: RedstoneBussing,
     max_steps: int,
     history_limit: int | None = 1,
 ) -> RedstoneBussing:
@@ -1100,14 +1114,21 @@ def redstone_bussing(
         end_pos=end_pos,
         start_xz_dir=start_xz_dir,
         end_xz_dir=end_xz_dir,
-        instance_points=set(),
-        other_busses=RedstoneBussing(),
+        instance_points=instance_points,
+        other_buses=other_buses,
         early_repeater_cost=12,
         momentum_break_cost=3,
         history_limit=history_limit,
     )
 
-    steps = a_star_bfs_searched_solution(problem, max_steps=max_steps)
+    try:
+        steps = a_star_bfs_searched_solution(problem, max_steps=max_steps)
+    except SearchTimeoutError as e:
+        raise BussingTimeoutError(f"Failed to find A* bus route: {e}")
+    except NoSolutionError:
+        raise BussingImpossibleError(
+            f"No way to bus between {start_pos} and {end_pos}."
+        )
 
     problem = replace(problem, history_limit=None)
 
@@ -1130,7 +1151,7 @@ def redstone_bussing_details(
     start_xz_dir: XZDirection | None,
     end_xz_dir: XZDirection | None,
     instance_points: set[Pos],
-    other_busses: RedstoneBussing,
+    other_buses: RedstoneBussing,
     max_steps: int,
     history_limit: int | None = 1,
     debug: bool = False,
@@ -1146,8 +1167,8 @@ def redstone_bussing_details(
         end_pos=end_pos,
         start_xz_dir=start_xz_dir,
         end_xz_dir=end_xz_dir,
-        instance_points=set(),
-        other_busses=RedstoneBussing(),
+        instance_points=instance_points,
+        other_buses=other_buses,
         early_repeater_cost=12,
         momentum_break_cost=3,
         history_limit=history_limit,

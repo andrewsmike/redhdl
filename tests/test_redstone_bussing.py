@@ -26,7 +26,7 @@ def test_search_durations():
                 start_xz_dir="south",
                 end_xz_dir="east",
                 instance_points=set(),
-                other_busses=RedstoneBussing(),
+                other_buses=RedstoneBussing(),
                 max_steps=5_000,
                 debug=False,
             )
