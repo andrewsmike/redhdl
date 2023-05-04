@@ -113,8 +113,10 @@ def placement_pin_seq_points(
 class PinPosPair:
     source_pin_id: PinId
     source_pin_pos: Pos
+    source_pin_facing: Direction | None
     dest_pin_id: PinId
     dest_pin_pos: Pos
+    dest_pin_facing: Direction | None
 
 
 def source_dest_pin_pos_pairs(
@@ -123,11 +125,18 @@ def source_dest_pin_pos_pairs(
 ) -> Iterable[PinPosPair]:
     """The pin@pos -> pin@pos pairs of a network + placement."""
     for network_id, network in netlist.networks.items():
+        instance_id, port_name = network.input_pin_id_seq.port_id
+        if instance_id == "input":
+            continue
+
         source_pin_points = placement_pin_seq_points(
             netlist, network.input_pin_id_seq, placement
         )
 
         for dest_pin_id_seq in network.output_pin_id_seqs:
+            instance_id, port_name = dest_pin_id_seq.port_id
+            if instance_id == "output":
+                continue
             dest_pin_points = placement_pin_seq_points(
                 netlist, dest_pin_id_seq, placement
             )
@@ -136,8 +145,10 @@ def source_dest_pin_pos_pairs(
                 PinPosPair(
                     source_pin_id=source_pin_id,
                     source_pin_pos=source_pin_pos,
+                    source_pin_facing=None,  # TODO: Specify this.
                     dest_pin_id=dest_pin_id,
                     dest_pin_pos=dest_pin_pos,
+                    dest_pin_facing=None,
                 )
                 for source_pin_id, source_pin_pos, dest_pin_id, dest_pin_pos in zip(
                     network.input_pin_id_seq.pin_ids,
@@ -158,12 +169,17 @@ MAX_PLACEMENT_ATTEMPTS = 40
 def netlist_random_placement(netlist: Netlist) -> InstancePlacement:
     assert all(
         isinstance(instance, SchematicInstance)
-        for instance in netlist.instances.values()
+        for name, instance in netlist.instances.items()
+        if name not in ["input", "output"]
     )
 
     instances: dict[str, SchematicInstance] = cast(
         dict[str, SchematicInstance],
-        {name: instance for name, instance in netlist.instances.items()},
+        {
+            name: instance
+            for name, instance in netlist.instances.items()
+            if name not in ["input", "output"]
+        },
     )
 
     max_area: Pos = sum(
@@ -201,7 +217,7 @@ def placement_compactness_score(
     return -sum(region.max_pos - region.min_pos)  # type: ignore
 
 
-MAX_PADDING = 4
+MAX_PADDING = 2
 
 
 def instance_buffer_blocks(netlist: Netlist, placement: InstancePlacement) -> float:
@@ -214,10 +230,8 @@ def instance_buffer_blocks(netlist: Netlist, placement: InstancePlacement) -> fl
             left.intersects(right) for left, right in combinations(padded_regions, 2)
         )
         if collision_count > 0:
-            return (
-                padding
-                - 1
-                + collision_count / len(list(combinations(padded_regions, 2)))
+            return padding - collision_count / len(
+                list(combinations(padded_regions, 2))
             )
 
     return MAX_PADDING
