@@ -10,30 +10,27 @@ Describe your instances and their configuration (here, schematic path):
 
 Specify the I/O relationships between your instances:
 >>> pprint(example_network_specs)
-{(('and', 'out'), Slice(0, 8, 1)): {(('output', 'out'), Slice(0, 8, 1))},
+{(('and', 'out'), Slice(0, 8, 1)): {(('not_out', 'in'), Slice(0, 8, 1))},
  (('input', 'a'), Slice(0, 8, 1)): {(('not_a', 'in'), Slice(0, 8, 1))},
  (('input', 'b'), Slice(0, 8, 1)): {(('not_b', 'in'), Slice(0, 8, 1))},
  (('not_a', 'out'), Slice(0, 8, 1)): {(('and', 'a'), Slice(0, 8, 1))},
- (('not_b', 'out'), Slice(0, 8, 1)): {(('and', 'b'), Slice(0, 8, 1))}}
+ (('not_b', 'out'), Slice(0, 8, 1)): {(('and', 'b'), Slice(0, 8, 1))},
+ (('not_out', 'out'), Slice(0, 8, 1)): {(('output', 'out'), Slice(0, 8, 1))}}
 
 Generate a thoroughly-typed Netlist object, with SchematicInstances, representing your netlist.
 >>> netlist = netlist_from_simple_spec(example_instance_configs, example_network_specs)
 >>> pprint(netlist)
 Netlist(instances={'and': SchematicInstance(...),
+                   'input': Instance(ports={}),
                    'not_a': SchematicInstance(...),
                    'not_b': SchematicInstance(...),
-                   'not_out': SchematicInstance(...)},
+                   'not_out': SchematicInstance(...),
+                   'output': Instance(ports={})},
         networks={0: Network(input_pin_id_seq=PinIdSequence(port_id=('not_a',
                                                                      'out'),
                                                             slice=Slice(0, 8, 1)),
                              output_pin_id_seqs={PinIdSequence(port_id=('and',
                                                                         'a'),
-                                                               slice=Slice(0, 8, 1))}),
-                  ...: Network(input_pin_id_seq=PinIdSequence(port_id=('and',
-                                                                     'out'),
-                                                            slice=Slice(0, 8, 1)),
-                             output_pin_id_seqs={PinIdSequence(port_id=('output',
-                                                                        'out'),
                                                                slice=Slice(0, 8, 1))}),
                   ...})
 
@@ -53,6 +50,12 @@ Netlist(instances={'and': SchematicInstance(...),
              +-----+
              | and |
              +-----+
+                *
+                *
+                *
+           +---------+
+           | not_out |
+           +---------+
                 *
                 *
                 *
@@ -92,7 +95,7 @@ example_network_specs: NetworkSpecs = {
     (("and", "out"), Slice(8)): {(("not_out", "in"), Slice(8))},
     (("input", "a"), Slice(8)): {(("not_a", "in"), Slice(8))},
     (("input", "b"), Slice(8)): {(("not_b", "in"), Slice(8))},
-    (("and", "out"), Slice(8)): {(("output", "out"), Slice(8))},
+    (("not_out", "out"), Slice(8)): {(("output", "out"), Slice(8))},
 }
 
 
@@ -113,13 +116,13 @@ def netlist_from_simple_spec(
             {
                 name: Port("out", bitwidth)
                 for name, bitwidth in (input_port_bitwidths or {}).items()
-            }
+            },
         ),
         "output": Instance(
             {
                 name: Port("in", bitwidth)
                 for name, bitwidth in (output_port_bitwidths or {}).items()
-            }
+            },
         ),
     }
     networks = {
