@@ -980,8 +980,14 @@ def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
     """
     axis_names = partial_coord(("X", "Y", "Z"), axes.index(axis))
 
-    assert len(regions) < 10
-    region_symbol = dict(zip(regions, "1234567890"))
+    region_symbols = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    if len(regions) > len(region_symbols):
+        raise ValueError(
+            f"Cannot display more than {len(region_symbols)} distinct regions - "
+            "not enough symbols. Please combine some regions."
+        )
+    region_symbol = dict(zip(regions, region_symbols))
+
     region_all_points = {
         region: {partial_coord(pos, axes.index(axis)) for pos in region}
         for region in regions
