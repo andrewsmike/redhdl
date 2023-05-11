@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from os import system
+from pprint import pprint
 from time import time
 
 from redhdl.bussing import BussingError
@@ -11,9 +12,9 @@ from redhdl.region import PointRegion, display_regions
 _DISTANCE = 20
 seen_step_min_costs = {}
 
-def display_step(step: Step, problem):
-    min_x, max_x = -1, _DISTANCE + 1
-    min_y, max_y = -1, _DISTANCE + 1
+def display_step(step: Step, problem, x_range, y_range):
+    min_x, max_x = x_range
+    min_y, max_y = y_range
     curr_step = step
 
     pos_prev_pos = {}
@@ -41,11 +42,19 @@ def display_step(step: Step, problem):
     for y in range(min_y, max_y):
         pos_symbol[(0, y)] = "."
 
+    for pos in problem.instance_points:
+        point_x, point_y, point_z = pos
+        pos_symbol[(point_x, point_z)] = "[###]"
+
+    for pos in problem.other_buses.element_blocks:
+        point_x, point_y, point_z = pos
+        pos_symbol[(point_x, point_z)] = " [~] "
+
     # for pos, min_cost in seen_step_min_costs.items():
     #     pos_symbol[(pos[0], pos[2])] = str(min_cost)
 
     for pos, (cost, min_cost) in bus_pos_costs_min_costs.items():
-        dy = (pos - pos_prev_pos.get(pos, Pos(0, 0, 0))).y
+        dy = (pos - pos_prev_pos.get(pos, problem.start_pos)).y
         if dy > 0:
             dir_sym = "^"
         elif dy == 0:
@@ -58,8 +67,7 @@ def display_step(step: Step, problem):
             pos_symbol[(pos[0], pos[2])] = f"<{min_cost}{dir_sym}>"
 
 
-    # system('clear')
-    from pprint import pprint
+    pprint(step.action)
     pprint(set(bus_pos_costs_min_costs.keys()))
     for y in range(max_y, min_y - 1, -1):
         print(
@@ -117,7 +125,12 @@ def main():
     )
 
     for expansion_step in expansion_steps:
-        display_step(expansion_step, debug_problem)
+        display_step(
+            expansion_step,
+            debug_problem,
+            x_range=(-1, _DISTANCE + 1),
+            y_range=(-1, _DISTANCE + 1),
+        )
         input()
 
 
