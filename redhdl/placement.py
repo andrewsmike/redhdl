@@ -9,14 +9,15 @@ Placement is SchematicInstance specific and provides schematic-specific helpers.
 """
 from dataclasses import dataclass
 from functools import reduce
-from itertools import combinations
 from operator import or_
+from pprint import pprint
 from random import choice, random, sample
 from typing import Iterable, cast
 
 from frozendict import frozendict
 from tqdm import tqdm
 
+from redhdl.caching import first_id_cached
 from redhdl.instances import SchematicInstance
 from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
 from redhdl.netlist import InstanceId, Netlist, PinId, PinIdSequence
@@ -25,6 +26,7 @@ from redhdl.region import (
     Direction,
     Pos,
     PositionSequence,
+    Region,
     any_overlap,
     direction_unit_pos,
     display_regions,
@@ -37,6 +39,7 @@ from redhdl.schematic import Schematic
 InstancePlacement = frozendict[InstanceId, tuple[Pos, Direction]]
 
 
+@first_id_cached
 def placement_valid(
     netlist: Netlist, placement: InstancePlacement, xz_padding: int = 1
 ) -> bool:
@@ -68,17 +71,32 @@ def placement_schematic(netlist: Netlist, placement: InstancePlacement) -> Schem
     return reduce(or_, instance_schematics)
 
 
+@first_id_cached
+def placement_instance_region(
+    netlist: Netlist,
+    placement: InstancePlacement,
+    instance_id: InstanceId,
+) -> Region:
+    pos, direction = placement[instance_id]
+
+    return (
+        cast(SchematicInstance, netlist.instances[instance_id])
+        .region.y_rotated(xz_directions.index(direction))
+        .shifted(pos)
+    )
+
+
+@first_id_cached
 def placement_region(netlist: Netlist, placement: InstancePlacement) -> CompositeRegion:
     return CompositeRegion(
         tuple(
-            cast(SchematicInstance, netlist.instances[instance_id])
-            .region.y_rotated(xz_directions.index(direction))
-            .shifted(pos)
-            for instance_id, (pos, direction) in placement.items()
+            placement_instance_region(netlist, placement, instance_id)
+            for instance_id in placement.keys()
         )
     )
 
 
+@first_id_cached
 def placement_pin_seq_points(
     netlist: Netlist,
     pin_id_seq: PinIdSequence,
@@ -109,58 +127,93 @@ def placement_pin_seq_points(
     return wire_points.y_rotated(xz_directions.index(instance_dir)) + instance_pos
 
 
-@dataclass(frozen=True, order=True)
-class PinPosPair:
-    source_pin_id: PinId
-    source_pin_pos: Pos
-    source_pin_facing: Direction | None
-    dest_pin_id: PinId
-    dest_pin_pos: Pos
-    dest_pin_facing: Direction | None
-
-
-def source_dest_pin_pos_pairs(
+def source_dest_pin_id_seq_pairs(
     netlist: Netlist,
-    placement: InstancePlacement,
-) -> Iterable[PinPosPair]:
-    """The pin@pos -> pin@pos pairs of a network + placement."""
+) -> Iterable[tuple[PinIdSequence, PinIdSequence]]:
+    """The PinIdSequence -> PinIdSequence pairs of a network."""
+
     for network_id, network in netlist.networks.items():
         instance_id, port_name = network.input_pin_id_seq.port_id
         if instance_id == "input":
             continue
 
-        source_pin_points = placement_pin_seq_points(
-            netlist, network.input_pin_id_seq, placement
-        )
-
         for dest_pin_id_seq in network.output_pin_id_seqs:
             instance_id, port_name = dest_pin_id_seq.port_id
             if instance_id == "output":
                 continue
-            dest_pin_points = placement_pin_seq_points(
-                netlist, dest_pin_id_seq, placement
-            )
 
-            yield from (
-                PinPosPair(
-                    source_pin_id=source_pin_id,
-                    source_pin_pos=source_pin_pos,
-                    source_pin_facing=None,  # TODO: Specify this.
-                    dest_pin_id=dest_pin_id,
-                    dest_pin_pos=dest_pin_pos,
-                    dest_pin_facing=None,
-                )
-                for source_pin_id, source_pin_pos, dest_pin_id, dest_pin_pos in zip(
-                    network.input_pin_id_seq.pin_ids,
-                    source_pin_points,
-                    dest_pin_id_seq.pin_ids,
-                    dest_pin_points,
-                )
+            yield (network.input_pin_id_seq, dest_pin_id_seq)
+
+
+@dataclass(frozen=True, order=True)
+class PinPosPair:
+    source_pin_id: PinId
+    source_pin_pos: Pos
+    source_pin_facing: Direction | None
+    source_port_stride: Pos
+
+    dest_pin_id: PinId
+    dest_pin_pos: Pos
+    dest_pin_facing: Direction | None
+    dest_port_stride: Pos
+
+
+@first_id_cached
+def source_dest_pin_pos_pairs(
+    netlist: Netlist,
+    placement: InstancePlacement,
+) -> list[PinPosPair]:
+    """The pin@pos -> pin@pos pairs of a network + placement."""
+    results: list[PinPosPair] = []
+
+    for source_pin_id_seq, dest_pin_id_seq in source_dest_pin_id_seq_pairs(netlist):
+
+        source_pin_points = placement_pin_seq_points(
+            netlist, source_pin_id_seq, placement
+        )
+
+        dest_pin_points = placement_pin_seq_points(netlist, dest_pin_id_seq, placement)
+
+        results.extend(
+            PinPosPair(
+                source_pin_id=source_pin_id,
+                source_pin_pos=source_pin_pos,
+                source_pin_facing=None,  # TODO: Specify this.
+                source_port_stride=source_pin_points.step,
+                dest_pin_id=dest_pin_id,
+                dest_pin_pos=dest_pin_pos,
+                dest_pin_facing=None,
+                dest_port_stride=dest_pin_points.step,
             )
+            for source_pin_id, source_pin_pos, dest_pin_id, dest_pin_pos in zip(
+                source_pin_id_seq.pin_ids,
+                source_pin_points,
+                dest_pin_id_seq.pin_ids,
+                dest_pin_points,
+            )
+        )
+
+    return results
 
 
 def display_placement(netlist: Netlist, placement: InstancePlacement):
-    display_regions(*list(placement_region(netlist, placement).subregions))
+    regions = {
+        instance_id: placement_instance_region(
+            netlist,
+            placement,
+            instance_id,
+        )
+        for instance_id in placement.keys()
+    }
+
+    ordered_instance_ids = list(sorted(placement.keys()))
+    display_regions(
+        *(
+            placement_instance_region(netlist, placement, instance_id)
+            for instance_id in ordered_instance_ids
+        )
+    )
+    pprint(dict(zip(range(1, len(ordered_instance_ids) + 1), ordered_instance_ids)))
 
 
 MAX_PLACEMENT_ATTEMPTS = 40
@@ -217,24 +270,41 @@ def placement_compactness_score(
     return -sum(region.max_pos - region.min_pos)  # type: ignore
 
 
-MAX_PADDING = 2
+MAX_PADDING = 5
 
 
-def instance_buffer_blocks(netlist: Netlist, placement: InstancePlacement) -> float:
-    region = placement_region(netlist, placement)
-    for padding in range(1, MAX_PADDING):
-        padded_regions = [
-            subregion.xz_padded(padding) for subregion in region.subregions
-        ]
-        collision_count = sum(
-            left.intersects(right) for left, right in combinations(padded_regions, 2)
-        )
-        if collision_count > 0:
-            return padding - collision_count / len(
-                list(combinations(padded_regions, 2))
+def avg_instance_buffer_blocks(netlist: Netlist, placement: InstancePlacement) -> float:
+    """
+    The average minimum padding space around each instance.
+
+    Only considers up to 5 spaces - enough for two busses to fit between.
+
+    Returns values in the range [0, 5], with 0 being "all instances have immediate neighbors"
+    and 5 being "all instances have 5 blocks of space around them".
+    """
+
+    composite_region = placement_region(netlist, placement)
+
+    buffer_blocks = 0
+    instance_count = len(composite_region.subregions)  # Denominator
+
+    for instance_region in composite_region.subregions:
+
+        other_regions = CompositeRegion(
+            tuple(
+                subregion
+                for subregion in composite_region.subregions
+                if subregion != instance_region
             )
+        )
 
-    return MAX_PADDING
+        for padding in range(1, MAX_PADDING + 1):
+            if instance_region.xz_padded(padding).intersects(other_regions):
+                break
+
+        buffer_blocks += padding - 1
+
+    return buffer_blocks / instance_count
 
 
 def random_searched_compact_placement(
@@ -288,16 +358,26 @@ def mutated_placement(placement: InstancePlacement) -> InstancePlacement:
     instances_to_tweak_count = max(len(placement) // 3, 2)
     instances_to_tweak = sample(list(placement.keys()), k=instances_to_tweak_count)
 
-    return frozendict(
-        {
-            instance_id: (
-                mutated_individual_placement(placement)
-                if instance_id in instances_to_tweak
-                else placement
-            )
-            for instance_id, placement in placement.items()
+    tweaked_placement = {
+        instance_id: (
+            mutated_individual_placement(placement)
+            if instance_id in instances_to_tweak
+            else placement
+        )
+        for instance_id, placement in placement.items()
+    }
+
+    # Occasionally swap two instances entirely.
+    if len(placement) > 1 and random() < 0.1:
+        first_instance_id, second_instance_id = sample(list(placement.keys()), k=2)
+
+        tweaked_placement = {
+            **tweaked_placement,
+            first_instance_id: tweaked_placement[second_instance_id],
+            second_instance_id: tweaked_placement[first_instance_id],
         }
-    )
+
+    return frozendict(tweaked_placement)
 
 
 @dataclass
