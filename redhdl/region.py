@@ -354,7 +354,7 @@ class PositionSequence:
                 f"Step {self.step} doesn't cleanly divide {self.start} => {self.stop}."
             )
 
-    @property
+    @cached_property
     def step(self) -> Pos:
         return (self.stop - self.start) / (self.count - 1)
 
@@ -411,7 +411,7 @@ class PositionSequence:
                 f"PositionSequence.__and__ expected Slice, got {type(other)}."
             )
 
-        assert isinstance(other, Slice)
+        assert isinstance(other, Slice)  # For MyPy.
 
         desired_indices = list(other.values())
 
@@ -423,10 +423,21 @@ class PositionSequence:
             count=len(desired_indices),
         )
 
+    def __getitem__(self, index: int) -> Pos:
+        if not isinstance(index, int):
+            raise TypeError(
+                f"PositionSequence.__getitem__() expected integer index, not value {index}."
+            )
+
+        return list(self)[index]
+
     def __iter__(self) -> Iterator[Pos]:
         step = self.step
+
+        curr_pos = self.start
         for i in range(self.count):
-            yield self.start + (step * i)
+            yield curr_pos
+            curr_pos += step
 
     def __len__(self) -> int:
         return self.count
@@ -574,6 +585,17 @@ class PointRegion(Region):
     def region_points(self) -> frozenset[Pos]:  # type: ignore
         return self.points
 
+    @cache
+    def intersects(self, other: "Region") -> bool:
+        # Fast AABB check.
+        if not (self.min_pos <= other.max_pos and self.max_pos >= other.min_pos):
+            return False
+
+        if isinstance(other, PointRegion):
+            return not self.points.isdisjoint(other.points)
+        else:
+            return other.intersects(self)
+
     def is_empty(self) -> bool:
         return len(self.points) == 0
 
@@ -666,6 +688,19 @@ class RectangularPrism(Region):
 
     def is_empty(self) -> bool:
         return not (self.min_pos <= self.max_pos)
+
+    @cache
+    def intersects(self, other: "Region") -> bool:
+        # Fast AABB check.
+        if not (self.min_pos <= other.max_pos and self.max_pos >= other.min_pos):
+            return False
+
+        if isinstance(other, PointRegion):
+            return any(self.min_pos <= point <= self.max_pos for point in other.points)
+        elif isinstance(other, RectangularPrism):
+            return True  # Already passed AABB check, so overlaps.
+        else:
+            return other.intersects(self)
 
     def __str__(self) -> str:
         return f"RectangularPrism({self.min_pos}, {self.max_pos})"
@@ -782,6 +817,17 @@ class CompositeRegion(Region):
     @cache
     def region_points(self) -> frozenset[Pos]:
         return frozenset.union(*(region.region_points() for region in self.subregions))
+
+    @cache
+    def intersects(self, other: "Region") -> bool:
+        # Fast AABB check.
+        if not (self.min_pos <= other.max_pos and self.max_pos >= other.min_pos):
+            return False
+
+        if isinstance(other, (PointRegion, RectangularPrism, CompositeRegion)):
+            return any(subregion.intersects(other) for subregion in self.subregions)
+        else:
+            return other.intersects(self)
 
 
 def any_overlap(regions: list[Region]) -> bool:
