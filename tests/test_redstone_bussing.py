@@ -19,7 +19,7 @@ def test_search_durations():
     start_time = time()
     for distance in [5, 10, 30, 70]:
         try:
-            bussing, states, steps, costs, algo_steps = redstone_bussing_details(
+            bussing, problem, states, steps, costs, algo_steps = redstone_bussing_details(
                 start_pos=Pos(0, 0, 0),
                 # end_pos=Pos(3, 2, 2),
                 end_pos=Pos(distance, distance, distance),

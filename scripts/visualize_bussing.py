@@ -90,7 +90,7 @@ def main():
     start_xz_dir = "south"
     end_xz_dir = "east"
 
-    bussing, states, steps, costs, algo_steps = redstone_bussing_details(
+    bussing, problem, states, steps, costs, algo_steps = redstone_bussing_details(
         start_pos=Pos(0, 0, 0),
         # end_pos=Pos(3, 2, 2),
         end_pos=Pos(_DISTANCE, _DISTANCE, _DISTANCE),

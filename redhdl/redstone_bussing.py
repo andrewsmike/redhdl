@@ -33,7 +33,7 @@ There's an ideal density score for each region.
 complicated.)
 
 Examples:
->>> bussing, states, steps, costs, algo_steps = redstone_bussing_details(
+>>> bussing, problem, states, steps, costs, algo_steps = redstone_bussing_details(
 ...     start_pos=Pos(0, 0, 0),
 ...     end_pos=Pos(3, 2, 2),
 ...     start_xz_dir="south",
@@ -477,7 +477,9 @@ class RedstoneBussing:
     def add_step(
         self,
         other_buses: "RedstoneBussing",
+        instance_points: set[Pos],
         prev_pos: Pos,
+        end_pos: Pos,
         step: RedstonePathStep,
     ) -> Optional["RedstoneBussing"]:
         """
@@ -528,6 +530,7 @@ class RedstoneBussing:
         below_block = step.next_pos + direction_unit_pos["down"]
 
         prev_was_repeater = prev_pos in self.repeater_directions
+        at_end_pos = step.next_pos == end_pos
 
         # [COLLISION 1] Foundation and wire/repeater blocks don't conflict with existing foundation,
         #     wire/repeater blocks.
@@ -537,8 +540,9 @@ class RedstoneBussing:
             | other_buses.element_foundation_blocks
             | self.element_blocks
             | self.element_foundation_blocks
+            | instance_points
         )
-        if len(placement_blocks & preexisting_placement_blocks) > 0:
+        if not at_end_pos and len(placement_blocks & preexisting_placement_blocks) > 0:
             return None
 
         if step.is_wire:
@@ -1026,7 +1030,9 @@ class RedstonePathFindingProblem(
 
             next_bussing = state.current_bussing.add_step(
                 self.other_buses,
+                instance_points=self.instance_points,
                 prev_pos=state.current_position,
+                end_pos=self.end_pos,
                 step=action,
             )
 
@@ -1186,10 +1192,11 @@ def redstone_bussing_details(
     history_limit: int | None = 1,
     debug: bool = False,
 ) -> tuple[
-    RedstoneBussing,
-    list[PartialBus],
-    list[RedstonePathStep],
-    list[float],
+    RedstoneBussing | None,
+    RedstonePathFindingProblem,
+    list[PartialBus] | None,
+    list[RedstonePathStep] | None,
+    list[float] | None,
     list[AlgoTraceStep[PartialBus | None, RedstonePathStep]],
 ]:
     base_problem = RedstonePathFindingProblem(
@@ -1207,11 +1214,14 @@ def redstone_bussing_details(
 
     try:
         steps = a_star_bfs_searched_solution(traced_problem, max_steps=max_steps)
-    except SearchTimeoutError as e:
-        raise BussingTimeoutError(f"Failed to find A* bus route: {e}")
-    except NoSolutionError:
-        raise BussingImpossibleError(
-            f"No way to bus between {start_pos} and {end_pos}."
+    except (NoSolutionError, SearchTimeoutError) as e:
+        return (
+            None,
+            base_problem,
+            None,
+            None,
+            None,
+            traced_problem.algo_steps,
         )
 
     problem = replace(base_problem, history_limit=None, debug=debug)
@@ -1237,6 +1247,7 @@ def redstone_bussing_details(
 
     return (
         state.current_bussing,
+        problem,
         cast(list[PartialBus], states),
         steps,
         step_costs,
