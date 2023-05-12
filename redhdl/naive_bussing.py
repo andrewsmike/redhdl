@@ -1,4 +1,5 @@
 from functools import reduce
+from math import log2
 import operator
 
 from redhdl.caching import first_id_cached
@@ -11,7 +12,11 @@ from redhdl.placement import (
     source_dest_pin_id_seq_pairs,
     source_dest_pin_pos_pairs,
 )
-from redhdl.redstone_bussing import RedstoneBussing, redstone_bussing
+from redhdl.redstone_bussing import (
+    RedstoneBussing,
+    min_redstone_bussing_cost,
+    redstone_bussing,
+)
 from redhdl.region import CompositeRegion, Pos, RectangularPrism
 from redhdl.schematic import Schematic
 
@@ -82,7 +87,7 @@ def bussing_max_length(pin_buses: PartialPinBuses) -> float:
     return max(successful_bus_path_lengths)
 
 
-def bussing_min_avg_length(netlist: Netlist, placement: InstancePlacement) -> float:
+def bussing_avg_min_length(netlist: Netlist, placement: InstancePlacement) -> float:
     l1s = [
         (pin_pos_pair.dest_pin_pos - pin_pos_pair.source_pin_pos).l1()
         for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement)
@@ -90,7 +95,7 @@ def bussing_min_avg_length(netlist: Netlist, placement: InstancePlacement) -> fl
     return sum(l1s) / len(l1s)
 
 
-def bussing_min_max_length(netlist: Netlist, placement: InstancePlacement) -> float:
+def bussing_max_min_length(netlist: Netlist, placement: InstancePlacement) -> float:
     l1s = [
         (pin_pos_pair.dest_pin_pos - pin_pos_pair.source_pin_pos).l1()
         for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement)
@@ -127,7 +132,7 @@ def pin_pair_excessive_downwards_pct(
 
 def misaligned_bus_pct(netlist: Netlist, placement: InstancePlacement) -> int:
     """
-    The percent of port pairs that are misaligned with each other.
+    The percent of port pairs that are shift-misaligned with each other.
 
     Shifting as an expensive and complicated operation. If ports have the same
     alignment, reward placements that exactly align them.
@@ -237,3 +242,31 @@ def crossed_bus_pct(netlist: Netlist, placement: InstancePlacement) -> float:
 @first_id_cached
 def too_far_to_bus_count(pin_buses: PartialPinBuses) -> int:
     return sum(bus is None for bus in pin_buses.values())
+
+
+@first_id_cached
+def avg_min_redstone_bus_len_score(
+    netlist: Netlist, placement: InstancePlacement
+) -> float:
+    """
+    Output range [0, 1], where 0 is "buses literally go one space" and 1 is
+    "buses require >=128 cost on average".
+    """
+    min_costs = [
+        min_redstone_bussing_cost(
+            start_pos=pin_pos_pair.source_pin_pos,
+            end_pos=pin_pos_pair.dest_pin_pos,
+            start_xz_dir=pin_pos_pair.source_pin_facing,
+            end_xz_dir=pin_pos_pair.dest_pin_facing,
+        )
+        for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement)
+    ]
+    avg_min_cost = sum(min_costs) / len(min_costs) if min_costs else 0
+
+    return min(
+        1,
+        max(
+            0,
+            log2(avg_min_cost) / 7,
+        ),
+    )

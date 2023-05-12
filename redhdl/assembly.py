@@ -6,11 +6,12 @@ from redhdl.bussing import BussingError
 from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
 from redhdl.naive_bussing import (
     PartialPinBuses,
+    avg_min_redstone_bus_len_score,
     bussed_placement_schematic,
     bussing_avg_length,
+    bussing_avg_min_length,
     bussing_max_length,
-    bussing_min_avg_length,
-    bussing_min_max_length,
+    bussing_max_min_length,
     crossed_bus_pct,
     dest_pin_buses,
     misaligned_bus_pct,
@@ -40,8 +41,8 @@ from redhdl.schematic import Schematic, save_schem
 
 def unbussable_placement_cost(netlist: Netlist, placement: InstancePlacement) -> float:
     return (
-        log2(bussing_min_avg_length(netlist, placement)) * 5
-        + log2(bussing_min_max_length(netlist, placement)) * 5
+        log2(bussing_avg_min_length(netlist, placement)) * 5
+        + log2(bussing_max_min_length(netlist, placement)) * 5
         + 20 / (placement_compactness_score(netlist, placement) + 10)
         + pin_pair_interrupted_line_of_sight_pct(netlist, placement) * 10
         + (6 - avg_instance_buffer_blocks(netlist, placement)) * 100
@@ -49,6 +50,7 @@ def unbussable_placement_cost(netlist: Netlist, placement: InstancePlacement) ->
         + (1 - stride_aligned_bus_pct(netlist, placement)) * 10
         + crossed_bus_pct(netlist, placement) * 40
         + pin_pair_excessive_downwards_pct(netlist, placement) * 40
+        + avg_min_redstone_bus_len_score(netlist, placement) * 10
     )
 
 

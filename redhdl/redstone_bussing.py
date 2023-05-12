@@ -981,8 +981,8 @@ class RedstonePathFindingProblem(
     instance_points: set[Pos]
     other_buses: "RedstoneBussing"
 
-    early_repeater_cost: int
-    momentum_break_cost: int
+    early_repeater_cost: int = 12
+    momentum_break_cost: int = 3
 
     # For efficient searching, truncate path history.
     history_limit: int | None = None
@@ -1152,8 +1152,6 @@ def redstone_bussing(
         end_xz_dir=end_xz_dir,
         instance_points=instance_points,
         other_buses=other_buses,
-        early_repeater_cost=12,
-        momentum_break_cost=3,
         history_limit=history_limit,
     )
 
@@ -1206,8 +1204,6 @@ def redstone_bussing_details(
         end_xz_dir=end_xz_dir,
         instance_points=instance_points,
         other_buses=other_buses,
-        early_repeater_cost=12,
-        momentum_break_cost=3,
         history_limit=history_limit,
     )
     traced_problem = TracedPathSearchProblem(base_problem)
@@ -1253,3 +1249,21 @@ def redstone_bussing_details(
         step_costs,
         traced_problem.algo_steps,
     )
+
+
+def min_redstone_bussing_cost(
+    start_pos: Pos,
+    end_pos: Pos,
+    start_xz_dir: XZDirection | None,
+    end_xz_dir: XZDirection | None,
+) -> float:
+    problem = RedstonePathFindingProblem(
+        start_pos=start_pos,
+        end_pos=end_pos,
+        start_xz_dir=start_xz_dir,
+        end_xz_dir=end_xz_dir,
+        instance_points=set(),
+        other_buses=RedstoneBussing(),
+    )
+
+    return problem.min_cost(problem.initial_state())
