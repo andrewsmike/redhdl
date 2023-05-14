@@ -28,7 +28,6 @@ def test_search_durations():
                 instance_points=set(),
                 other_buses=RedstoneBussing(),
                 max_steps=5_000,
-                debug=False,
             )
             expanding_steps = [
                 step for step in algo_steps if step.algo_action == "expanding_step"

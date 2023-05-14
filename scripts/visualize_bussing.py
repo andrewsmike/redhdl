@@ -99,7 +99,6 @@ def main():
         instance_points=set(),
         other_buses=RedstoneBussing(),
         max_steps=10000,
-        debug=False,
     )
     duration = time() - start_time
 
@@ -112,6 +111,7 @@ def main():
 
     print(_DISTANCE, (_DISTANCE + 1) ** 3, duration, len(expansion_steps))
 
+    getLogger("redhdl.redstone_bussing").setLevel("DEBUG")
     debug_problem = RedstonePathFindingProblem(
         start_pos=Pos(0, 0, 0),
         end_pos=Pos(_DISTANCE, _DISTANCE, _DISTANCE),
@@ -121,8 +121,8 @@ def main():
         other_buses=RedstoneBussing(),
         early_repeater_cost=12,
         momentum_break_cost=3,
-        debug=True,
     )
+    getLogger("redhdl.redstone_bussing").setLevel("INFO")
 
     for expansion_step in expansion_steps:
         display_step(

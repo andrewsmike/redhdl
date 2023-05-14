@@ -41,7 +41,6 @@ Examples:
 ...     instance_points=set(),
 ...     other_buses=RedstoneBussing(),
 ...     max_steps=10000,
-...     debug=False,
 ... )
 
 >>> pprint(bussing)
@@ -121,6 +120,7 @@ Y  [(0, 3)]
 """
 from dataclasses import dataclass, field, replace
 from functools import reduce
+from logging import getLogger
 from random import choice
 from typing import Any, Literal, NamedTuple, Optional, cast
 
@@ -155,6 +155,10 @@ from redhdl.region import (
     zero_pos,
 )
 from redhdl.schematic import Block, Schematic
+
+logger = getLogger(__name__)
+logger.setLevel("INFO")
+
 
 # TODO: Replace "repeater" with separate representation of pre-block, post-block, etc, with
 # real signal stregth values (1, 0, and 15 respectively).
@@ -803,7 +807,6 @@ class PartialBus(NamedTuple):
 def _next_momentum_xy_z_and_momentum_broken(
     state: PartialBus,
     action: RedstonePathStep,
-    debug: bool = False,
 ) -> tuple[XZDirection, BusYDirection | None, bool]:
     step = action.next_pos - state.current_position
     step_xz_dir = cast(XZDirection, unit_pos_direction[step.xz_pos()])
@@ -848,21 +851,20 @@ def _next_momentum_xy_z_and_momentum_broken(
             else:
                 momentum_y_dir = step_y_dir
 
-    if debug:
-        print(
-            "pos, step xz/y momentums, step_y_dir, prev xz/y momentum, repeater, broken:"
+    logger.debug(
+        "pos, step xz/y momentums, step_y_dir, prev xz/y momentum, repeater, broken:"
+    )
+    logger.debug(
+        (
+            step,
+            step_xz_dir,
+            step_y_dir,
+            state.momentum_xz_dir,
+            state.momentum_y_dir,
+            action.is_repeater,
+            momentum_broken,
         )
-        print(
-            (
-                step,
-                step_xz_dir,
-                step_y_dir,
-                state.momentum_xz_dir,
-                state.momentum_y_dir,
-                action.is_repeater,
-                momentum_broken,
-            )
-        )
+    )
 
     return momentum_xz_dir, momentum_y_dir, momentum_broken
 
@@ -871,7 +873,6 @@ def _min_xz_turns(
     distance_vector: Pos,
     start_xz_momentum: XZDirection | None,
     end_xz_momentum: XZDirection | None,
-    debug: bool = False,
 ):
     """
     Minimum turns (momentum breaks) calculation for the X/Z axes:
@@ -937,8 +938,16 @@ def _min_y_turns(
     distance_vector: Pos,
     start_y_momentum: BusYDirection | None,
 ):
-    # TODO. Implementing this would speed up search, but not implementing it does not affect correctness.
-    return 0
+    # TODO. Implementing a better version of this would speed up search, but not
+    # implementing it does not affect correctness.
+
+    # Single heuristic to help placement search avoid challenging y alignments:
+    horizontal_distance = abs(distance_vector.xz_pos()).l1()
+    distance_down = -distance_vector.y
+    if distance_down > horizontal_distance:
+        return 1
+    else:
+        return 0
 
 
 @dataclass
@@ -986,8 +995,6 @@ class RedstonePathFindingProblem(
 
     # For efficient searching, truncate path history.
     history_limit: int | None = None
-
-    debug: bool = False
 
     def initial_state(self) -> PartialBus:
         return PartialBus(
@@ -1067,15 +1074,14 @@ class RedstonePathFindingProblem(
                 state.current_position
             ]
             if sig_strength == "repeater" or sig_strength > 1:
-                if self.debug:
-                    print("EARLY REPEATER")
+                logger.debug("Early repeater")
                 cost += self.early_repeater_cost
 
         (
             momentum_xz_dir,
             _,
             momentum_broken,
-        ) = _next_momentum_xy_z_and_momentum_broken(state, action, debug=self.debug)
+        ) = _next_momentum_xy_z_and_momentum_broken(state, action)
 
         momentum_didnt_match_at_end_pos = (
             action.next_pos == self.end_pos
@@ -1083,8 +1089,7 @@ class RedstonePathFindingProblem(
             and self.end_xz_dir != momentum_xz_dir
         )
         if momentum_broken or momentum_didnt_match_at_end_pos:
-            if self.debug:
-                print("MOMENTUM BROKEN")
+            logger.debug("MOMENTUM BROKEN")
             cost += self.momentum_break_cost
 
         return cost
@@ -1113,7 +1118,6 @@ class RedstonePathFindingProblem(
             distance_vector,
             start_xz_momentum=state.momentum_xz_dir,
             end_xz_momentum=self.end_xz_dir,
-            debug=self.debug,
         )
 
         min_turns_y = _min_y_turns(
@@ -1123,14 +1127,13 @@ class RedstonePathFindingProblem(
 
         min_momentum_breaks = max(min_turns_xz, min_turns_y)
 
-        if self.debug:
-            print(
-                "xzdist, ydist, min xz turns, min y turns:",
-                xz_distance,
-                y_distance,
-                min_turns_xz,
-                min_turns_y,
-            )
+        logger.debug(
+            "xzdist, ydist, min xz turns, min y turns:",
+            xz_distance,
+            y_distance,
+            min_turns_xz,
+            min_turns_y,
+        )
 
         return min_steps + min_momentum_breaks * self.momentum_break_cost
 
@@ -1188,7 +1191,6 @@ def redstone_bussing_details(
     other_buses: RedstoneBussing,
     max_steps: int,
     history_limit: int | None = 1,
-    debug: bool = False,
 ) -> tuple[
     RedstoneBussing | None,
     RedstonePathFindingProblem,
@@ -1220,7 +1222,7 @@ def redstone_bussing_details(
             traced_problem.algo_steps,
         )
 
-    problem = replace(base_problem, history_limit=None, debug=debug)
+    problem = replace(base_problem, history_limit=None)
 
     states: list[PartialBus | None] = []
     step_costs: list[float] = []
