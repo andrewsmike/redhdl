@@ -36,6 +36,7 @@ Schematic(pos_blocks={Pos(0, 0, 0): Block(block_type='minecraft:oak_wall_sign',
 
 from dataclasses import dataclass
 from json import loads
+from typing import Literal
 
 from frozendict import frozendict
 from nbtlib import File as NBTFile
@@ -53,6 +54,45 @@ from redhdl.region import (
     is_direction,
     xz_direction_y_rotated,
 )
+
+BlockColor = Literal[
+    "white",
+    "orange",
+    "magenta",
+    "light_blue",
+    "yellow",
+    "lime",
+    "pink",
+    "gray",
+    "silver",
+    "cyan",
+    "purple",
+    "blue",
+    "brown",
+    "green",
+    "red",
+    "black",
+]
+
+
+block_colors: list[BlockColor] = [
+    "white",
+    "orange",
+    "magenta",
+    "light_blue",
+    "yellow",
+    "lime",
+    "pink",
+    "gray",
+    "silver",
+    "cyan",
+    "purple",
+    "blue",
+    "brown",
+    "green",
+    "red",
+    "black",
+]
 
 
 @dataclass(frozen=True, order=True)

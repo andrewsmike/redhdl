@@ -46,7 +46,7 @@ def unbussable_placement_cost(netlist: Netlist, placement: InstancePlacement) ->
         + 20 / (placement_compactness_score(netlist, placement) + 10)
         + pin_pair_interrupted_line_of_sight_pct(netlist, placement) * 10
         + (6 - avg_instance_buffer_blocks(netlist, placement)) * 100
-        + misaligned_bus_pct(netlist, placement) * 10
+        + misaligned_bus_pct(netlist, placement) * 50
         + (1 - stride_aligned_bus_pct(netlist, placement)) * 10
         + crossed_bus_pct(netlist, placement) * 40
         + pin_pair_excessive_downwards_pct(netlist, placement) * 40
@@ -131,13 +131,19 @@ class BussingPlacementProblem(LocalSearchProblem[InstancePlacement]):
 
     def mutated_solution(self, solution: InstancePlacement) -> InstancePlacement:
         try:
+            unbussable_cost = unbussable_placement_cost(self.netlist, solution)
+            if unbussable_cost > 275:
+                raise BussingError(
+                    "This looks like a terrible placement. Trying again."
+                )
+
             # This call should be cached and return (or raise) immediately.
             bussing = dest_pin_buses(self.netlist, solution)
         except BussingError:
             return mutated_unbussable_placement(
                 self.netlist,
                 solution,
-                total_rounds=512,
+                total_rounds=2**14,
             )
         else:
             return mutated_bussable_placement(self.netlist, solution, bussing)
@@ -148,11 +154,14 @@ class BussingPlacementProblem(LocalSearchProblem[InstancePlacement]):
         if not placement_valid(self.netlist, solution):
             return 1_000_000
 
+        unbussable_cost = unbussable_placement_cost(self.netlist, solution)
+        if unbussable_cost > 275:
+            return 100_000 + unbussable_cost
         try:
             bussing = dest_pin_buses(self.netlist, solution)
         except BussingError as e:
             print(f"Unbussable! Error: {e}")
-            return 100_000 + unbussable_placement_cost(self.netlist, solution)
+            return 100_000 + unbussable_cost
         else:
             print("Bussable!")  # Collision count: {collision_count(bussing)}")
             return bussable_placement_cost(self.netlist, solution, bussing)
@@ -174,7 +183,7 @@ def assembled_circuit_schem(
         return bussed_placement_schematic(netlist, placement, pin_buses)
 
     # TOTAL_ROUNDS = 1_000
-    TOTAL_ROUNDS = 15
+    TOTAL_ROUNDS = 150
 
     def checkpoint(round: int, placement: InstancePlacement, cost: float):
         path = f"checkpoints/output_{round}.schem"

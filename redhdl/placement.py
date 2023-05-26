@@ -24,6 +24,7 @@ from redhdl.netlist import InstanceId, Netlist, PinId, PinIdSequence
 from redhdl.region import (
     CompositeRegion,
     Direction,
+    PointRegion,
     Pos,
     PositionSequence,
     Region,
@@ -206,13 +207,22 @@ def display_placement(netlist: Netlist, placement: InstancePlacement):
         for instance_id in placement.keys()
     }
 
+    pin_pos_pairs = source_dest_pin_pos_pairs(netlist, placement)
+    source_poses = frozenset(
+        pin_pos_pair.source_pin_pos for pin_pos_pair in pin_pos_pairs
+    )
+    dest_poses = frozenset(pin_pos_pair.dest_pin_pos for pin_pos_pair in pin_pos_pairs)
+
     ordered_instance_ids = list(sorted(placement.keys()))
     display_regions(
         *(
             placement_instance_region(netlist, placement, instance_id)
             for instance_id in ordered_instance_ids
-        )
+        ),
+        PointRegion(source_poses),
+        PointRegion(dest_poses),
     )
+    ordered_instance_ids += ["outputs", "inputs"]
     pprint(dict(zip(range(1, len(ordered_instance_ids) + 1), ordered_instance_ids)))
 
 

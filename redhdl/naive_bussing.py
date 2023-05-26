@@ -43,7 +43,7 @@ def dest_pin_buses(
                 end_xz_dir=pin_pos_pair.dest_pin_facing,
                 instance_points=instance_region_points,
                 other_buses=other_buses,
-                max_steps=512,
+                max_steps=2_048,
             )
         except BaseException:
             from time import time
