@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 from math import log2
+from pprint import pprint
 from random import seed
 
 from redhdl.bussing import BussingError
+from redhdl.caching import first_id_cached
 from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
 from redhdl.naive_bussing import (
     PartialPinBuses,
@@ -29,7 +31,7 @@ from redhdl.netlist_template import (
 )
 from redhdl.placement import (
     InstancePlacement,
-    avg_instance_buffer_blocks,
+    avg_instance_padding_blocks,
     display_placement,
     mutated_placement,
     netlist_random_placement,
@@ -39,32 +41,100 @@ from redhdl.placement import (
 from redhdl.schematic import Schematic, save_schem
 
 
+def _weighted_costs(
+    costs: dict[str, float], weights: dict[str, float]
+) -> dict[str, float]:
+    return {
+        heuristic_name: cost * weights[heuristic_name]
+        for heuristic_name, cost in costs.items()
+    }
+
+
+@first_id_cached
+def unbussable_placement_heuristic_costs(
+    netlist: Netlist, placement: InstancePlacement
+) -> dict[str, float]:
+    return {
+        "bussing_avg_min_length": log2(bussing_avg_min_length(netlist, placement)),
+        "bussing_max_min_length": log2(bussing_max_min_length(netlist, placement)),
+        "placement_size": 1
+        + 1 / (placement_compactness_score(netlist, placement) + 10),
+        "interrupted_pin_lines_of_sight": pin_pair_interrupted_line_of_sight_pct(
+            netlist, placement
+        ),
+        "avg_missing_padding_blocks": (
+            1 - avg_instance_padding_blocks(netlist, placement) / 5
+        ),
+        "shift_misaligned_bus": misaligned_bus_pct(netlist, placement),
+        "stride_misaligned_bus": (1 - stride_aligned_bus_pct(netlist, placement)),
+        "crossed_buses": crossed_bus_pct(netlist, placement),
+        "excessive_downwards": pin_pair_excessive_downwards_pct(netlist, placement),
+        "min_redstone_cost": avg_min_redstone_bus_len_score(netlist, placement),
+    }
+
+
+_unbussable_placement_heuristic_weights: dict[str, float] = {
+    "bussing_avg_min_length": 5,
+    "bussing_max_min_length": 5,
+    "placement_size": 20,
+    "interrupted_pin_lines_of_sight": 10,
+    "avg_missing_padding_blocks": 100,
+    "shift_misaligned_bus": 50,
+    "stride_misaligned_bus": 10,
+    "crossed_buses": 40,
+    "excessive_downwards": 40,
+    "min_redstone_cost": 10,
+}
+
+
 def unbussable_placement_cost(netlist: Netlist, placement: InstancePlacement) -> float:
-    return (
-        log2(bussing_avg_min_length(netlist, placement)) * 5
-        + log2(bussing_max_min_length(netlist, placement)) * 5
-        + 20 / (placement_compactness_score(netlist, placement) + 10)
-        + pin_pair_interrupted_line_of_sight_pct(netlist, placement) * 10
-        + (6 - avg_instance_buffer_blocks(netlist, placement)) * 100
-        + misaligned_bus_pct(netlist, placement) * 50
-        + (1 - stride_aligned_bus_pct(netlist, placement)) * 10
-        + crossed_bus_pct(netlist, placement) * 40
-        + pin_pair_excessive_downwards_pct(netlist, placement) * 40
-        + avg_min_redstone_bus_len_score(netlist, placement) * 10
+    return sum(
+        _weighted_costs(
+            unbussable_placement_heuristic_costs(netlist, placement),
+            _unbussable_placement_heuristic_weights,
+        ).values()
     )
+
+
+_bussable_placement_heuristic_weights: dict[str, float] = {
+    "compactness": 6,
+    "bussing_avg_length": 15,
+    "bussing_max_length": 15,
+    "avg_missing_padding_blocks": 2,
+    "shift_misaligned_bus": 5,
+    "stride_misaligned_bus": 5,
+    "crossed_buses": 2,
+    "excessive_downwards": 8,
+}
+
+
+@first_id_cached
+def bussable_placement_heuristic_costs(
+    netlist: Netlist, placement: InstancePlacement, bussing: PartialPinBuses
+) -> dict[str, float]:
+    return {
+        # collision_count(bussing) * 20
+        "compactness": 1 / (placement_compactness_score(netlist, placement) + 10),
+        "bussing_avg_length": bussing_avg_length(bussing),
+        "bussing_max_length": bussing_max_length(bussing),
+        "avg_missing_padding_blocks": (
+            1 - avg_instance_padding_blocks(netlist, placement) / 5
+        ),
+        "shift_misaligned_bus": misaligned_bus_pct(netlist, placement),
+        "stride_misaligned_bus": (1 - stride_aligned_bus_pct(netlist, placement)),
+        "crossed_buses": crossed_bus_pct(netlist, placement),
+        "excessive_downwards": pin_pair_excessive_downwards_pct(netlist, placement),
+    }
 
 
 def bussable_placement_cost(
     netlist: Netlist, placement: InstancePlacement, bussing: PartialPinBuses
 ) -> float:
-    return (
-        # collision_count(bussing) * 20
-        -placement_compactness_score(netlist, placement)
-        + bussing_avg_length(bussing) / 6
-        + bussing_max_length(bussing) / 6
-        + (6 - avg_instance_buffer_blocks(netlist, placement)) * 5
-        + misaligned_bus_pct(netlist, placement) * 10
-        + pin_pair_excessive_downwards_pct(netlist, placement) * 40
+    return sum(
+        _weighted_costs(
+            bussable_placement_heuristic_costs(netlist, placement, bussing),
+            _bussable_placement_heuristic_weights,
+        ).values()
     )
 
 
@@ -149,7 +219,22 @@ class BussingPlacementProblem(LocalSearchProblem[InstancePlacement]):
             return mutated_bussable_placement(self.netlist, solution, bussing)
 
     def solution_cost(self, solution: InstancePlacement) -> float:
+
         display_placement(self.netlist, solution)
+
+        print("Placement:")
+        pprint(dict(solution))
+
+        costs = unbussable_placement_heuristic_costs(self.netlist, solution)
+        print("Unweighted heuristic costs:")
+        pprint(costs)
+
+        weighted_costs = _weighted_costs(
+            costs,
+            _unbussable_placement_heuristic_weights,
+        )
+        print("Weighted heuristic costs:")
+        pprint(weighted_costs)
 
         if not placement_valid(self.netlist, solution):
             return 1_000_000
@@ -191,10 +276,6 @@ def assembled_circuit_schem(
             f"[{round + 1}/{TOTAL_ROUNDS}] Saving solution with cost {cost} to {path}..."
         )
         try:
-            from pprint import pprint
-
-            print("Placement:")
-            pprint(placement)
             schem = solution_schematic(placement)
             save_schem(schem, path)
             # from pprint import pprint

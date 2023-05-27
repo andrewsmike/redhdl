@@ -283,7 +283,9 @@ def placement_compactness_score(
 MAX_PADDING = 5
 
 
-def avg_instance_buffer_blocks(netlist: Netlist, placement: InstancePlacement) -> float:
+def avg_instance_padding_blocks(
+    netlist: Netlist, placement: InstancePlacement
+) -> float:
     """
     The average minimum padding space around each instance.
 
@@ -295,7 +297,7 @@ def avg_instance_buffer_blocks(netlist: Netlist, placement: InstancePlacement) -
 
     composite_region = placement_region(netlist, placement)
 
-    buffer_blocks = 0
+    padding_blocks = 0
     instance_count = len(composite_region.subregions)  # Denominator
 
     for instance_region in composite_region.subregions:
@@ -312,9 +314,9 @@ def avg_instance_buffer_blocks(netlist: Netlist, placement: InstancePlacement) -
             if instance_region.xz_padded(padding).intersects(other_regions):
                 break
 
-        buffer_blocks += padding - 1
+        padding_blocks += padding - 1
 
-    return buffer_blocks / instance_count
+    return padding_blocks / instance_count
 
 
 def random_searched_compact_placement(

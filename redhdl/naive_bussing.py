@@ -119,18 +119,21 @@ def pin_pair_interrupted_line_of_sight_pct(
 def pin_pair_excessive_downwards_pct(
     netlist: Netlist, placement: InstancePlacement
 ) -> float:
-    return sum(
-        1
-        for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement)
-        if abs(delta := pin_pos_pair.dest_pin_pos - pin_pos_pair.source_pin_pos)
-        .xz_pos()
-        .l1()
-        < abs(delta.y)
-        and delta.y < 0
-    ) / len(list(source_dest_pin_pos_pairs(netlist, placement)))
+    excessively_downwards_pins = 0.0
+    denom = 0.0
+    for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement):
+        denom += 1
+        delta = pin_pos_pair.dest_pin_pos - pin_pos_pair.source_pin_pos
+        delta_horiz_dist = abs(delta).xz_pos().l1()
+        if delta.y < 0 and delta_horiz_dist < abs(delta.y):
+            excessively_downwards_pins += 0.2
+        elif delta.y < 0 and delta_horiz_dist < abs(delta.y):
+            excessively_downwards_pins += 1
+
+    return excessively_downwards_pins / denom
 
 
-def misaligned_bus_pct(netlist: Netlist, placement: InstancePlacement) -> int:
+def misaligned_bus_pct(netlist: Netlist, placement: InstancePlacement) -> float:
     """
     The percent of port pairs that are shift-misaligned with each other.
 
@@ -155,10 +158,10 @@ def misaligned_bus_pct(netlist: Netlist, placement: InstancePlacement) -> int:
 
         delta = dest_pin_points[0] - source_pin_points[0]
 
-        if (delta * source_pin_points.step).l1() == 0:
+        if (delta * source_pin_points.step).l1() != 0:
             misaligned_bus_count += 1
 
-    return misaligned_bus_count // bus_count
+    return misaligned_bus_count / bus_count
 
 
 def stride_aligned_bus_pct(netlist: Netlist, placement: InstancePlacement) -> float:
@@ -229,7 +232,7 @@ def crossed_bus_pct(netlist: Netlist, placement: InstancePlacement) -> float:
         region.intersects(
             other_regions := CompositeRegion(
                 tuple(
-                    region
+                    other_region
                     for other_port_pair, other_region in port_pair_region.items()
                     if other_port_pair != port_pair
                 )
