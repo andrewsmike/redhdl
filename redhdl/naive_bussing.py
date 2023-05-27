@@ -107,6 +107,7 @@ def pin_pair_interrupted_line_of_sight_pct(
     netlist: Netlist, placement: InstancePlacement
 ) -> float:
     instance_regions = placement_region(netlist, placement)
+
     return sum(
         1
         for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement)

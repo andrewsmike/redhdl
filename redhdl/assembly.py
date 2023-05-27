@@ -57,8 +57,9 @@ def unbussable_placement_heuristic_costs(
     return {
         "bussing_avg_min_length": log2(bussing_avg_min_length(netlist, placement)),
         "bussing_max_min_length": log2(bussing_max_min_length(netlist, placement)),
-        "placement_size": 1
-        + 1 / (placement_compactness_score(netlist, placement) + 10),
+        "placement_size": (
+            1 + 1 / (placement_compactness_score(netlist, placement) + 10)
+        ),
         "interrupted_pin_lines_of_sight": pin_pair_interrupted_line_of_sight_pct(
             netlist, placement
         ),
@@ -79,10 +80,10 @@ _unbussable_placement_heuristic_weights: dict[str, float] = {
     "placement_size": 20,
     "interrupted_pin_lines_of_sight": 10,
     "avg_missing_padding_blocks": 100,
-    "shift_misaligned_bus": 50,
-    "stride_misaligned_bus": 10,
+    "shift_misaligned_bus": 30,
+    "stride_misaligned_bus": 50,
     "crossed_buses": 40,
-    "excessive_downwards": 40,
+    "excessive_downwards": 80,
     "min_redstone_cost": 10,
 }
 
@@ -97,24 +98,27 @@ def unbussable_placement_cost(netlist: Netlist, placement: InstancePlacement) ->
 
 
 _bussable_placement_heuristic_weights: dict[str, float] = {
-    "compactness": 6,
-    "bussing_avg_length": 15,
-    "bussing_max_length": 15,
-    "avg_missing_padding_blocks": 2,
-    "shift_misaligned_bus": 5,
-    "stride_misaligned_bus": 5,
-    "crossed_buses": 2,
-    "excessive_downwards": 8,
+    "placement_size": 20,
+    "interrupted_pin_lines_of_sight": 10,
+    "avg_missing_padding_blocks": 10,
+    "shift_misaligned_bus": 15,
+    "stride_misaligned_bus": 25,
+    "crossed_buses": 20,
+    "excessive_downwards": 30,
+    "min_redstone_cost": 10,
+    "bussing_avg_length": 20,
+    "bussing_max_length": 20,
 }
 
 
-@first_id_cached
 def bussable_placement_heuristic_costs(
     netlist: Netlist, placement: InstancePlacement, bussing: PartialPinBuses
 ) -> dict[str, float]:
     return {
         # collision_count(bussing) * 20
-        "compactness": 1 / (placement_compactness_score(netlist, placement) + 10),
+        "placement_size": (
+            1 + 1 / (placement_compactness_score(netlist, placement) + 10)
+        ),
         "bussing_avg_length": bussing_avg_length(bussing),
         "bussing_max_length": bussing_max_length(bussing),
         "avg_missing_padding_blocks": (
@@ -277,6 +281,7 @@ def assembled_circuit_schem(
         )
         try:
             schem = solution_schematic(placement)
+            print(schem.pos_blocks.min_pos(), schem.pos_blocks.max_pos())
             save_schem(schem, path)
             # from pprint import pprint
             # pprint(schem)

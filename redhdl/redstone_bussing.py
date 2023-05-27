@@ -154,7 +154,7 @@ from redhdl.region import (
     xz_directions,
     zero_pos,
 )
-from redhdl.schematic import Block, Schematic
+from redhdl.schematic import Block, BlockColor, Schematic, block_colors
 
 logger = getLogger(__name__)
 logger.setLevel("INFO")
@@ -222,26 +222,6 @@ class RedstonePathStep(NamedTuple):
         ]
 
         return place_wire_steps + place_repeater_steps
-
-
-_colors = [
-    "white",
-    "orange",
-    "magenta",
-    "light_blue",
-    "yellow",
-    "lime",
-    "pink",
-    "gray",
-    "silver",
-    "cyan",
-    "purple",
-    "blue",
-    "brown",
-    "green",
-    "red",
-    "black",
-]
 
 
 @dataclass(frozen=True)
@@ -403,7 +383,7 @@ class RedstoneBussing:
         self,
         pos: Pos,
         other_bus_airspace_blocks: set[Pos] | frozenset[Pos],
-        color: str | None = None,
+        color: BlockColor | None = None,
     ) -> Block:
         if pos in self.element_sig_strengths:
             if pos in self.repeater_directions:
@@ -454,7 +434,7 @@ class RedstoneBussing:
         self,
         # Other busses' airspaces determine which base blocks are transparent.
         other_bus_airspace_blocks: set[Pos] | frozenset[Pos],
-        color: str | None,
+        color: BlockColor | None,
     ) -> PositionalData[Block]:
         return PositionalData(
             (pos, block)
@@ -467,7 +447,7 @@ class RedstoneBussing:
 
     def schem(self) -> Schematic:
         return Schematic(
-            pos_blocks=self.pos_blocks(set(), color=choice(_colors)),
+            pos_blocks=self.pos_blocks(set(), color=choice(block_colors)),
             pos_sign_lines=PositionalData(),
         )
 
