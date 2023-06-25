@@ -39,9 +39,11 @@ from json import loads
 from typing import Literal
 
 from frozendict import frozendict
+import matplotlib.pyplot as plt
 from nbtlib import File as NBTFile
 from nbtlib import load
 from nbtlib.tag import ByteArray, Compound, Int, Short
+import numpy as np
 
 from redhdl.positional_data import PositionalData, PositionMask
 from redhdl.region import (
@@ -64,7 +66,7 @@ BlockColor = Literal[
     "lime",
     "pink",
     "gray",
-    "silver",
+    "light_gray",
     "cyan",
     "purple",
     "blue",
@@ -84,7 +86,7 @@ block_colors: list[BlockColor] = [
     "lime",
     "pink",
     "gray",
-    "silver",
+    "light_gray",
     "cyan",
     "purple",
     "blue",
@@ -265,12 +267,6 @@ def save_schem(schematic: Schematic, dest_path: str):
     # TODO: Save sign metadata.
     blocks = schematic.pos_blocks
 
-    # The original 0, 0, 0 will be where it pastes from.
-    if blocks:
-        we_pos = -blocks.min_pos()
-    else:
-        we_pos = Pos(0, 0, 0)
-
     blocks = blocks.shift_normalized()
 
     if blocks:
@@ -307,9 +303,9 @@ def save_schem(schematic: Schematic, dest_path: str):
                 "DataVersion": Int(2584),
                 "Metadata": Compound(
                     {
-                        "WEOffsetX": Int(we_pos[X_AXIS_INDEX]),
-                        "WEOffsetY": Int(we_pos[Y_AXIS_INDEX]),
-                        "WEOffsetZ": Int(we_pos[Z_AXIS_INDEX]),
+                        "WEOffsetX": Int(0),
+                        "WEOffsetY": Int(0),
+                        "WEOffsetZ": Int(0),
                     }
                 ),
                 "Height": Short(max_pos[Y_AXIS_INDEX] + 1),
@@ -327,3 +323,62 @@ def save_schem(schematic: Schematic, dest_path: str):
     schem.save(dest_path)
 
     return nbt_data
+
+
+RGBColor = tuple[int, int, int]
+
+
+def _block_color(block: Block) -> str:
+    block_type_suffix_color: dict[str, str] = {
+        "sign": "brown",
+        #
+        "glass": "cyan",
+        "wool": "navy",
+        #
+        "wire": "crimson",
+        "torch": "red",
+        "repeater": "darkred",
+        "comparator": "purple",
+        # Shouldn't occur.
+        "air": "white",
+    }
+
+    for block_type_suffix, color in block_type_suffix_color.items():
+        if block.block_type.endswith(block_type_suffix):
+            return color
+    else:
+        return color
+
+
+def display_schematic(schem: Schematic):
+    normed_schem = schem.shift_normalized()
+    region = normed_schem.rect_region()
+    min_pos, max_pos = region.min_pos, region.max_pos
+
+    if min_pos != Pos(0, 0, 0):
+        raise RuntimeError(
+            f"Expected shift_normalized schematic to center on Pos(0, 0, 0), not {min_pos}."
+        )
+
+    region_size = max_pos + Pos(1, 1, 1)
+
+    block_mask = np.zeros(region_size, dtype=bool)
+    block_colors = np.empty(region_size, dtype=object)  # Optional RGBColor.
+    for block_pos, block in normed_schem.pos_blocks.items():
+        if block.block_type == "minecraft:air":
+            continue
+
+        block_mask[block_pos] = True
+        block_colors[block_pos] = _block_color(block)
+
+    # In PLT, the z coordinate is up, whereas in minecraft y is up.
+    # Swap the Z axis with the Y axis.
+    plt_indexing = (X_AXIS_INDEX, Z_AXIS_INDEX, Y_AXIS_INDEX)
+
+    block_mask = block_mask.transpose(plt_indexing)
+    block_colors = block_colors.transpose(plt_indexing)
+
+    ax = plt.figure().add_subplot(projection="3d")
+    ax.voxels(block_mask, facecolors=block_colors, edgecolor="k")
+
+    plt.show()

@@ -281,7 +281,9 @@ def assembled_circuit_schem(
         )
         try:
             schem = solution_schematic(placement)
-            print(schem.pos_blocks.min_pos(), schem.pos_blocks.max_pos())
+            print(
+                f"Schematic coords: {schem.pos_blocks.min_pos()} => {schem.pos_blocks.max_pos()}"
+            )
             save_schem(schem, path)
             # from pprint import pprint
             # pprint(schem)
