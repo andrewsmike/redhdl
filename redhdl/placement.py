@@ -35,7 +35,7 @@ from redhdl.region import (
     random_pos,
     xz_directions,
 )
-from redhdl.schematic import Schematic, display_schematic
+from redhdl.schematic import Schematic
 
 InstancePlacement = frozendict[InstanceId, tuple[Pos, Direction]]
 
@@ -224,8 +224,6 @@ def display_placement(netlist: Netlist, placement: InstancePlacement):
     )
     ordered_instance_ids += ["outputs", "inputs"]
     pprint(dict(zip(range(1, len(ordered_instance_ids) + 1), ordered_instance_ids)))
-
-    display_schematic(placement_schematic(netlist, placement))
 
 
 MAX_PLACEMENT_ATTEMPTS = 40

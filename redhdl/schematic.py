@@ -34,9 +34,13 @@ Schematic(pos_blocks={Pos(0, 0, 0): Block(block_type='minecraft:oak_wall_sign',
           pos_sign_lines=...)
 """
 
+import atexit
 from dataclasses import dataclass
+from functools import cache
 from json import loads
-from typing import Literal
+from subprocess import Popen
+from tempfile import NamedTemporaryFile
+from typing import Literal, Optional
 
 from frozendict import frozendict
 import matplotlib.pyplot as plt
@@ -350,7 +354,16 @@ def _block_color(block: Block) -> str:
         return color
 
 
-def display_schematic(schem: Schematic):
+@cache
+def _plt_fig_ax_text():
+    fig = plt.figure()
+    ax = fig.add_subplot(projection="3d")
+    text = fig.text(0.0, 0.0, "")
+
+    return fig, ax, text
+
+
+def display_schematic(schem: Schematic, desc: Optional[str] = None) -> None:
     normed_schem = schem.shift_normalized()
     region = normed_schem.rect_region()
     min_pos, max_pos = region.min_pos, region.max_pos
@@ -362,23 +375,49 @@ def display_schematic(schem: Schematic):
 
     region_size = max_pos + Pos(1, 1, 1)
 
-    block_mask = np.zeros(region_size, dtype=bool)
     block_colors = np.empty(region_size, dtype=object)  # Optional RGBColor.
     for block_pos, block in normed_schem.pos_blocks.items():
         if block.block_type == "minecraft:air":
             continue
 
-        block_mask[block_pos] = True
         block_colors[block_pos] = _block_color(block)
 
     # In PLT, the z coordinate is up, whereas in minecraft y is up.
     # Swap the Z axis with the Y axis.
-    plt_indexing = (X_AXIS_INDEX, Z_AXIS_INDEX, Y_AXIS_INDEX)
+    block_colors = block_colors.transpose(
+        (X_AXIS_INDEX, Z_AXIS_INDEX, Y_AXIS_INDEX),
+    )
 
-    block_mask = block_mask.transpose(plt_indexing)
-    block_colors = block_colors.transpose(plt_indexing)
+    block_mask = ~np.equal(block_colors, None)  # type: ignore
 
-    ax = plt.figure().add_subplot(projection="3d")
-    ax.voxels(block_mask, facecolors=block_colors, edgecolor="k")
+    fig, ax, text = _plt_fig_ax_text()
+
+    ax.clear()
+    ax.voxels(
+        block_mask,
+        facecolors=block_colors,
+        edgecolor="k",
+    )
+
+    if desc:
+        text.set_text(desc)
 
     plt.show()
+
+
+@cache
+def _interactive_schem_desc_paths(prefix: str) -> tuple[str, str]:
+    schem_file = NamedTemporaryFile(prefix=f"{prefix}_", suffix=".schem")
+    desc_file = NamedTemporaryFile(prefix=f"{prefix}_", suffix=".txt")
+    display_proc = Popen(
+        ["scripts/display_schem.py", schem_file.name, desc_file.name],
+    )
+    atexit.register(lambda: display_proc.kill())
+    return schem_file.name, desc_file.name
+
+
+def interactive_display_schematic(schem: Schematic, name: str, desc: str):
+    schem_path, desc_file_path = _interactive_schem_desc_paths(prefix=name)
+    save_schem(schem, schem_path)
+    with open(desc_file_path, "w") as f:
+        f.write(desc)

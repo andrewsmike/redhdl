@@ -33,13 +33,13 @@ from redhdl.netlist_template import (
 from redhdl.placement import (
     InstancePlacement,
     avg_instance_padding_blocks,
-    display_placement,
     mutated_placement,
     netlist_random_placement,
     placement_compactness_score,
+    placement_schematic,
     placement_valid,
 )
-from redhdl.schematic import Schematic, save_schem
+from redhdl.schematic import Schematic, interactive_display_schematic, save_schem
 
 
 def _weighted_costs(
@@ -227,48 +227,59 @@ class BussingPlacementProblem(LocalSearchProblem[InstancePlacement]):
             return mutated_unbussable_placement(
                 self.netlist,
                 solution,
-                total_rounds=2**14,
+                total_rounds=2**10,
             )
         else:
             return mutated_bussable_placement(self.netlist, solution, bussing)
 
     def solution_cost(self, solution: InstancePlacement) -> float:
 
-        display_placement(self.netlist, solution)
-
         print("Placement:")
         pprint(dict(solution))
 
-        costs = unbussable_placement_heuristic_costs(self.netlist, solution)
-        print("Unweighted heuristic costs:")
-        pprint(costs)
-
-        weighted_costs = _weighted_costs(
-            costs,
-            _unbussable_placement_heuristic_weights,
-        )
-        print("Weighted heuristic costs:")
-        pprint(weighted_costs)
-
-        if not placement_valid(self.netlist, solution):
-            return 1_000_000
-
         unbussable_cost = unbussable_placement_cost(self.netlist, solution)
-        if unbussable_cost > 275:
-            return 100_000 + unbussable_cost
+        bussable = False
         try:
+            if unbussable_cost > 275:
+                return 100_000 + unbussable_cost
+
             bussing = dest_pin_buses(self.netlist, solution)
-        except BussingError as e:
-            print(f"Unbussable! Error: {e}")
-            return 100_000 + unbussable_cost
-        else:
-            print("Bussable!")  # Collision count: {collision_count(bussing)}")
+            bussable = True
             return bussable_placement_cost(self.netlist, solution, bussing)
+        except BussingError as e:
+            return 100_000 + unbussable_cost
+
+        finally:
+            if bussable:
+                bussable_str = "Bussable"
+                costs = bussable_placement_heuristic_costs(
+                    self.netlist, solution, bussing
+                )
+                weights = _bussable_placement_heuristic_weights
+            else:
+                bussable_str = "Unbussable"
+                costs = unbussable_placement_heuristic_costs(self.netlist, solution)
+                weights = _unbussable_placement_heuristic_weights
+
+            weighted_costs = _weighted_costs(costs, weights)
+
+            desc = (
+                f"{bussable_str} cost: {sum(weighted_costs.values())}\n"
+                + "Factors:\n"
+                + pformat(weighted_costs)
+            )
+
+            interactive_display_schematic(
+                placement_schematic(self.netlist, solution),
+                "current_placement",
+                desc,
+            )
 
 
 def assembled_circuit_schem(
     instance_config: dict[InstanceId, InstanceConfig],
     network_specs: NetworkSpecs,
+    debug: bool = False,
 ) -> Schematic:
     netlist = netlist_from_simple_spec(
         instance_config=instance_config,
@@ -286,22 +297,17 @@ def assembled_circuit_schem(
 
     def checkpoint(round: int, placement: InstancePlacement, cost: float):
         path = f"checkpoints/output_{round}.schem"
-        print(
-            f"[{round + 1}/{TOTAL_ROUNDS}] Saving solution with cost {cost} to {path}..."
-        )
         try:
             schem = solution_schematic(placement)
-            print(
-                f"Schematic coords: {schem.pos_blocks.min_pos()} => {schem.pos_blocks.max_pos()}"
-            )
             save_schem(schem, path)
-            # from pprint import pprint
-            # pprint(schem)
+
         except BussingError as e:
-            print(f"Failed to save due to bussing error: {e}")
+            print(
+                f"[{round + 1}/{TOTAL_ROUNDS}] Failed to checkpoint due to bussing error: {e}"
+            )
 
     seed(0xDEADBEEF)
-    placement_problem = BussingPlacementProblem(netlist)
+    placement_problem = BussingPlacementProblem(netlist, debug=debug)
     placement = sim_annealing_searched_solution(
         placement_problem,
         total_rounds=TOTAL_ROUNDS,
@@ -325,6 +331,7 @@ def main():
     schem = assembled_circuit_schem(
         example_instance_configs,
         example_network_specs,
+        debug=False,
     )
     save_schem(schem, "output.schem")
 
