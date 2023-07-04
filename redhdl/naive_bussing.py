@@ -134,6 +134,19 @@ def pin_pair_excessive_downwards_pct(
     return excessively_downwards_pins / denom
 
 
+def pin_pair_straight_up_pct(netlist: Netlist, placement: InstancePlacement) -> float:
+    straight_up_pins = 0.0
+    denom = 0.0
+    for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement):
+        denom += 1
+        delta = pin_pos_pair.dest_pin_pos - pin_pos_pair.source_pin_pos
+        delta_horiz_dist = abs(delta).xz_pos().l1()
+        if delta.y > 0 and delta_horiz_dist == 0:
+            straight_up_pins += 1
+
+    return straight_up_pins / denom
+
+
 def misaligned_bus_pct(netlist: Netlist, placement: InstancePlacement) -> float:
     """
     The percent of port pairs that are shift-misaligned with each other.
@@ -141,9 +154,9 @@ def misaligned_bus_pct(netlist: Netlist, placement: InstancePlacement) -> float:
     Shifting as an expensive and complicated operation. If ports have the same
     alignment, reward placements that exactly align them.
 
-    Output range [0, 1], with 1 being "all misaligned" and 0 being "none misaligned".
+    Output range [0, 1], with 1 being "all _very_ misaligned" and 0 being "none misaligned".
     """
-    misaligned_bus_count = 0
+    misaligned_bus_count = 0.0
     bus_count = 0
 
     for source_pin_id_seq, dest_pin_id_seq in source_dest_pin_id_seq_pairs(netlist):
@@ -159,8 +172,9 @@ def misaligned_bus_pct(netlist: Netlist, placement: InstancePlacement) -> float:
 
         delta = dest_pin_points[0] - source_pin_points[0]
 
-        if (delta * source_pin_points.step).l1() != 0:
-            misaligned_bus_count += 1
+        stride_direction_error = (delta * source_pin_points.step).l1()
+
+        misaligned_bus_count += (min(log2(stride_direction_error + 1), 8)) / 8
 
     return misaligned_bus_count / bus_count
 
@@ -269,8 +283,5 @@ def avg_min_redstone_bus_len_score(
 
     return min(
         1,
-        max(
-            0,
-            log2(avg_min_cost) / 7,
-        ),
+        log2(avg_min_cost + 1) / 7,
     )
