@@ -60,24 +60,38 @@ def vhdl_parser_from_str(expr: str) -> vhdlParser:
     return parser
 
 
-def vhdl_tree_from_stream(input_stream: InputStream) -> ParseTree:
+def vhdl_tree_from_stream(
+    input_stream: InputStream,
+    node_type: str = "design_file",
+) -> ParseTree:
     lexer = vhdlLexer(input_stream)
     token_stream = CommonTokenStream(lexer)
     parser = vhdlParser(token_stream)
 
     parser.addErrorListener(AbortSyntaxErrorListener())
 
-    program = parser.design_file()
+    if not hasattr(parser, node_type):
+        raise ValueError(f"Unknown root node_type {node_type}; cannot parse vhdl.")
+    parse_node_type_func = getattr(parser, node_type)
 
-    return program
+    return parse_node_type_func()
 
 
 def vhdl_tree_from_file(path: str) -> ParseTree:
     return vhdl_tree_from_stream(FileStream(path))
 
 
-def vhdl_tree_from_str(source: str) -> ParseTree:
-    return vhdl_tree_from_stream(InputStream(source))
+def vhdl_tree_from_str(
+    source: str,
+    node_type: str = "design_file",
+) -> ParseTree:
+    """
+    >>> print(bracket_printed_vhdl_parse_tree(
+    ...     vhdl_tree_from_str("unsigned(1 downto 0)", "subtype_indication")
+    ... ))
+    ['unsigned', ['(', ['1', 'downto', '0'], ')']]
+    """
+    return vhdl_tree_from_stream(InputStream(source), node_type=node_type)
 
 
 # BracketParseTree = list["BracketParseTree"] | str

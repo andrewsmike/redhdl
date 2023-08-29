@@ -4,7 +4,7 @@ Simplified parse-tree to replace antlr's overly-robust ParseTree implementation.
 from dataclasses import dataclass, field
 from functools import wraps
 from pprint import pformat, pprint
-from typing import Any
+from typing import Any, Callable
 
 from antlr4.tree.Tree import ParseTree as ANTLRParseTree
 from antlr4.tree.Trees import Trees
@@ -83,9 +83,13 @@ def parse_tree_from_file(path: str) -> ParseTree:
     return parse_tree_from_antlr(antlr_parse_tree)
 
 
-def parse_tree_from_str(source: str) -> ParseTree:
-    antlr_parse_tree = vhdl_tree_from_str(source)
+def parse_tree_from_str(source: str, node_type: str = "design_file") -> ParseTree:
+    antlr_parse_tree = vhdl_tree_from_str(source, node_type=node_type)
     return parse_tree_from_antlr(antlr_parse_tree)
+
+
+def parsed(*args, **kwargs) -> ParseTree:
+    return parse_tree_from_str(*args, **kwargs)
 
 
 # For pretty printing ParseTrees.
@@ -136,6 +140,13 @@ def pprint_tree(parse_tree: ParseTree) -> None:
     pprint(simplified_tree(parse_tree))
 
 
+def str_from_parse_tree(parse_tree: ParseTree) -> str:
+    if parse_tree.text is not None:
+        return parse_tree.text
+    else:
+        return " ".join(str_from_parse_tree(child) for child in parse_tree.children)
+
+
 def parse_tree_query(func):
     """
     Similar to @singledispatch, but where the first argument is a ParseTree
@@ -174,6 +185,8 @@ def parse_tree_query(func):
     def wrapper_register(node_type: str):
         def wrapped_register(visitor_func):
             func.node_type_visitor_func[node_type] = visitor_func
+            visitor_func.register = wrapper_register
+
             return visitor_func
 
         return wrapped_register
@@ -184,14 +197,50 @@ def parse_tree_query(func):
     return wrapper
 
 
+def called_on_node_type(*node_types: str) -> Callable[[Callable], Callable]:
+    """
+    >>> @called_on_node_type("my_node_type")
+    ... def my_node_name(blah: ParseTree, *args, **kwargs):
+    ...     return "_".join(child.text for child in blah.children)
+
+    >>> my_node = ParseTree(
+    ...     "my_node_type", [ParseTree("HELLO", [], "hello"), ParseTree("WORLD", [], "world")]
+    ... )
+    >>> print(my_node_name(my_node))
+    hello_world
+
+    >>> print(my_node_name(ParseTree("wrong_node_type", [], "blah")))
+    Traceback (most recent call last):
+      ...
+    ValueError: Attempted to invoke my_node_name with wrong_node_type, expected one of {'my_node_type'}.
+    """
+
+    def decorator(func) -> Callable:
+        @wraps(func)
+        def wrapper(node: ParseTree, *args, **kwargs):
+            if node.node_type not in node_types:
+                raise ValueError(
+                    f"Attempted to invoke {func.__name__} with {node.node_type}, "
+                    + f"expected one of {set(node_types)}."
+                )
+            return func(node, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 def next_child(
     children: list[ParseTree],
     step: int | str,
+    raise_on_ambiguous: bool = True,
 ) -> ParseTree | None:
 
     if isinstance(step, int):
-        assert step < len(children)
-        return children[step]
+        if len(children) <= step:
+            return None
+        else:
+            return children[step]
 
     elif isinstance(step, str):
         matching_children = [
@@ -203,16 +252,41 @@ def next_child(
         elif len(matching_children) == 1:
             return matching_children[0]
         else:
-            raise ValueError(
-                f"Multiple children have node type {step}, expected only one."
-            )
+            if raise_on_ambiguous:
+                raise ValueError(
+                    f"Multiple children have node type {step}, expected only one."
+                )
+            else:
+                return None
     else:
         raise ValueError(
             f"Path steps are either indices (ints) or node_types (str). Got {step}."
         )
 
 
-def parse_tree_get(parse_tree: ParseTree | None, *path: int | str) -> ParseTree | None:
+def children_of_type(
+    node: ParseTree,
+    children_types: str | set[str],
+) -> list[ParseTree]:
+    if isinstance(children_types, str):
+        acceptable_node_types = {children_types}
+    elif isinstance(children_types, set):
+        acceptable_node_types = children_types
+    else:
+        raise ValueError(
+            f"Expected either node_type or set[node_type], got {children_types}"
+        )
+
+    return [
+        child for child in node.children if child.node_type in acceptable_node_types
+    ]
+
+
+def parse_tree_get(
+    parse_tree: ParseTree | None,
+    *path: int | str,
+    raise_on_ambiguous: bool = False,
+) -> ParseTree | None:
     if parse_tree is None:
         return None
 
@@ -225,7 +299,9 @@ def parse_tree_get(parse_tree: ParseTree | None, *path: int | str) -> ParseTree 
     next_step, *remaining_path = path
 
     return parse_tree_get(
-        next_child(parse_tree.children, next_step),
+        next_child(
+            parse_tree.children, next_step, raise_on_ambiguous=raise_on_ambiguous
+        ),
         *remaining_path,
     )
 
