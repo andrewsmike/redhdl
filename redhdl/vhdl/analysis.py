@@ -58,6 +58,7 @@ dict_keys([None])
 tmp_ivl_15 and tmp_ivl_24
 """
 from dataclasses import dataclass
+from pprint import pformat
 from typing import Any, cast
 
 from redhdl.netlist import Port
@@ -66,6 +67,7 @@ from redhdl.vhdl.parse_tree import (
     called_on_node_type,
     children_of_type,
     parse_tree_assert_get,
+    parse_tree_from_file,
     parse_tree_get,
     parse_tree_query,
 )
@@ -1013,3 +1015,137 @@ def architecture_var_assignments_architecture_body(
         del results["UNKNOWN_ARCH"]
 
     return results
+
+
+@dataclass
+class Architecture:
+    name: str
+
+    ports: dict[str, Port]
+    subinstances: dict[str, ArchitectureSubinstance]
+    var_bitranges: dict[str, BitRange]
+    var_bitrange_assignments: dict[str, dict[BitRange, Expression]]
+
+    @property
+    def dependencies(self) -> set[str]:
+        return {subinstance.entity_name for subinstance in self.subinstances.values()}
+
+
+def with_resolved_bitranges(
+    var_bitrange_assignments: dict[str, dict[BitRange | None, Expression]],
+    var_bitranges: dict[str, BitRange],
+    ports: dict[str, Port],
+) -> dict[str, dict[BitRange, Expression]]:
+    all_bitranges = var_bitranges | {
+        port_name: (0, port.pin_count - 1) for port_name, port in ports.items()
+    }
+    undeclared_variables = {
+        var_name
+        for var_name in var_bitrange_assignments.keys()
+        if var_name not in all_bitranges
+    }
+    if any(undeclared_variables):
+        raise ValueError(
+            f"Variables {undeclared_variables} isn't a port or declared variable, "
+            + "can't resolve bitwidth."
+        )
+
+    return {
+        var_name: {
+            cast(
+                BitRange,
+                (bitrange if bitrange is not None else all_bitranges.get(var_name)),
+            ): assignment
+            for bitrange, assignment in bitrange_assignments.items()
+        }
+        for var_name, bitrange_assignments in var_bitrange_assignments.items()
+    }
+
+
+def arches_from_vhdl_path(vhdl_path: str) -> dict[str, Architecture]:
+    """
+    >>> arches = arches_from_vhdl_path("hdl_examples/simple/Simple.vhdl")
+    >>> pprint(arches)
+    {'Simple_Cell': Architecture(name='Simple_Cell',
+                                 ports={'A': Port(port_type='in', pin_count=1),
+                                        'B': Port(port_type='in', pin_count=1),
+                                        'C': Port(port_type='out', pin_count=1)},
+                                 subinstances={},
+                                 var_bitranges={'L': (0, 0)},
+                                 var_bitrange_assignments={'C': {(0, 0): ...},...}),
+     'Simple_Row': Architecture(...)}
+    """
+    parse_tree = parse_tree_from_file(vhdl_path)
+
+    arch_ports = architecture_ports(parse_tree)
+    arch_subinstances = architecture_subinstances(parse_tree)
+    arch_var_bitranges = architecture_local_var_bitrange(parse_tree)
+    arch_assignments = architecture_var_assignments(parse_tree)
+
+    arch_names = (
+        arch_subinstances.keys()
+        | arch_ports.keys()
+        | arch_var_bitranges.keys()
+        | arch_assignments.keys()
+    )
+
+    return {
+        arch_name: Architecture(
+            name=arch_name,
+            ports=(ports := arch_ports.get(arch_name, {})),
+            subinstances=arch_subinstances.get(arch_name, {}),
+            var_bitranges=(var_bitranges := arch_var_bitranges.get(arch_name, {})),
+            var_bitrange_assignments=with_resolved_bitranges(
+                arch_assignments.get(arch_name, {}),
+                var_bitranges,
+                ports=ports,
+            ),
+        )
+        for arch_name in arch_names
+    }
+
+
+def ordered_arches(arches: dict[str, Architecture]) -> list[Architecture]:
+    """
+    Using subinstance entity types, determine the correct architecture build order.
+
+    Unordered by default:
+    >>> arches = arches_from_vhdl_path("hdl_examples/simple/Simple.vhdl")
+    >>> type(arches)
+    <class 'dict'>
+
+    Build-ordered:
+    >>> type(ordered_arches(arches))
+    <class 'list'>
+
+    >>> [arch.name for arch in ordered_arches(arches)]
+    ['Simple_Cell', 'Simple_Row']
+    """
+    arch_dependencies = {
+        arch_name: arch.dependencies for arch_name, arch in arches.items()
+    }
+
+    specified_arches = set(arches.keys())
+
+    ordered_arches = []
+
+    # All unspecified arches are assumed to be preexisting and resolved elsewhere.
+    unresolved_arches = set(specified_arches)
+    while unresolved_arches:
+        next_arches = sorted(
+            arch
+            for arch in unresolved_arches
+            if len(arch_dependencies[arch] & unresolved_arches) == 0
+        )
+        if not next_arches:
+            raise ValueError(
+                "Failed to resolve architecture evaluation order: There must be a cycle."
+                + pformat(
+                    {"unresolved": unresolved_arches, "dependencies": arch_dependencies}
+                )
+            )
+
+        ordered_arches.extend(next_arches)
+        unresolved_arches -= set(next_arches)
+
+    return [arches[arch_name] for arch_name in ordered_arches]
