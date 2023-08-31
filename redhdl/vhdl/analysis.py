@@ -121,6 +121,10 @@ def bitrange_width(bitrange: BitRange) -> int:
     return stop - start + 1
 
 
+def port_bitrange(port: Port) -> BitRange:
+    return (0, port.pin_count - 1)
+
+
 @called_on_node_type("subtype_indication")
 def subtype_indication_bitrange(parse_tree: ParseTree) -> BitRange:
     signal_type = parse_tree_assert_get(
@@ -312,7 +316,7 @@ def tree_architecture_nodes_architecture_body(
 class ArchitectureSubinstance:
     instance_name: str
     entity_name: str
-    port_exprs: dict[tuple[str, BitRange], ParseTree]
+    port_exprs: dict[tuple[str, BitRange | None], ParseTree]
 
 
 @dataclass
@@ -662,7 +666,7 @@ def association_element_name_slice_expr(
 @called_on_node_type("component_instantiation_statement")
 def component_port_exprs(
     parse_tree: ParseTree,
-) -> dict[tuple[str, BitRange], ParseTree]:
+) -> dict[tuple[str, BitRange | None], ParseTree]:
     assoc_list = parse_tree_assert_get(
         parse_tree, "port_map_aspect", "association_list"
     )
@@ -1031,13 +1035,50 @@ class Architecture:
         return {subinstance.entity_name for subinstance in self.subinstances.values()}
 
 
+def with_resolved_port_bitranges(
+    subinstances: dict[str, ArchitectureSubinstance],
+    arch_ports: dict[str, dict[str, Port]],
+) -> dict[str, ArchitectureSubinstance]:
+
+    undeclared_ports = {
+        port_name
+        for subinst in subinstances.values()
+        for (port_name, _) in subinst.port_exprs.keys()
+        if port_name not in arch_ports.get(subinst.entity_name, {})
+    }
+    if any(undeclared_ports):
+        raise ValueError(
+            f"No entity port declaration for {undeclared_ports}; can't resolve port "
+            + "assignment bitwidths."
+        )
+
+    return {
+        subinst_name: ArchitectureSubinstance(
+            instance_name=subinst.instance_name,
+            entity_name=subinst.entity_name,
+            port_exprs={
+                (
+                    port_name,
+                    (
+                        bitrange
+                        if bitrange is not None
+                        else port_bitrange(arch_ports[subinst.entity_name][port_name])
+                    ),
+                ): expr
+                for (port_name, bitrange), expr in subinst.port_exprs.items()
+            },
+        )
+        for subinst_name, subinst in subinstances.items()
+    }
+
+
 def with_resolved_bitranges(
     var_bitrange_assignments: dict[str, dict[BitRange | None, Expression]],
     var_bitranges: dict[str, BitRange],
     ports: dict[str, Port],
 ) -> dict[str, dict[BitRange, Expression]]:
     all_bitranges = var_bitranges | {
-        port_name: (0, port.pin_count - 1) for port_name, port in ports.items()
+        port_name: port_bitrange(port) for port_name, port in ports.items()
     }
     undeclared_variables = {
         var_name
@@ -1054,7 +1095,7 @@ def with_resolved_bitranges(
         var_name: {
             cast(
                 BitRange,
-                (bitrange if bitrange is not None else all_bitranges.get(var_name)),
+                (bitrange if bitrange is not None else all_bitranges[var_name]),
             ): assignment
             for bitrange, assignment in bitrange_assignments.items()
         }
@@ -1093,7 +1134,10 @@ def arches_from_vhdl_path(vhdl_path: str) -> dict[str, Architecture]:
         arch_name: Architecture(
             name=arch_name,
             ports=(ports := arch_ports.get(arch_name, {})),
-            subinstances=arch_subinstances.get(arch_name, {}),
+            subinstances=with_resolved_port_bitranges(
+                arch_subinstances.get(arch_name, {}),
+                arch_ports,
+            ),
             var_bitranges=(var_bitranges := arch_var_bitranges.get(arch_name, {})),
             var_bitrange_assignments=with_resolved_bitranges(
                 arch_assignments.get(arch_name, {}),
