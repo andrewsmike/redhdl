@@ -1,6 +1,28 @@
 """
-How do we derive a single Netlist level from a given architecture in a vHDL AST?
+Boil iverlog-generated vHDL files down to a set of netlist-like Architecture objects.
 
+# Top-level example
+>>> arches = arches_from_vhdl_path("hdl_examples/simple/Simple.vhdl")
+>>> pprint(arches)
+{'Simple_Cell': Architecture(name='Simple_Cell',
+                             ports={'A': Port(port_type='in', pin_count=1),
+                                    'B': Port(port_type='in', pin_count=1),
+                                    'C': Port(port_type='out', pin_count=1)},
+                             subinstances={},
+                             var_bitranges={'L': (0, 0)},
+                             var_bitrange_assignments={'C': {(0, 0): ...},...}),
+ 'Simple_Row': Architecture(...)}
+
+>>> print(ordered_arches(arches))
+['Simple_Cell', 'Simple_Row']
+
+
+# Architecture field details
+Below are the helpers that are used to populate Architecture fields. These fully specify
+Architecture semantics, except for the assignment bitrange resolution pass _currently_
+performed in `arches_from_vhdl_path`.
+
+How do we derive a single Netlist level from a given architecture in a vHDL AST?
 We need a few things.
 >>> parse_tree = parse_tree_from_file("hdl_examples/simple/Simple.vhdl")
 
@@ -1130,6 +1152,8 @@ def arches_from_vhdl_path(vhdl_path: str) -> dict[str, Architecture]:
         | arch_assignments.keys()
     )
 
+    # Note: it'd be nicer to break out the bitrange resolving pass, so it can be
+    # used in different contexts / with more port expressions available.
     return {
         arch_name: Architecture(
             name=arch_name,
@@ -1149,7 +1173,7 @@ def arches_from_vhdl_path(vhdl_path: str) -> dict[str, Architecture]:
     }
 
 
-def ordered_arches(arches: dict[str, Architecture]) -> list[Architecture]:
+def ordered_arches(arches: dict[str, Architecture]) -> list[str]:
     """
     Using subinstance entity types, determine the correct architecture build order.
 
@@ -1158,11 +1182,7 @@ def ordered_arches(arches: dict[str, Architecture]) -> list[Architecture]:
     >>> type(arches)
     <class 'dict'>
 
-    Build-ordered:
-    >>> type(ordered_arches(arches))
-    <class 'list'>
-
-    >>> [arch.name for arch in ordered_arches(arches)]
+    >>> ordered_arches(arches)
     ['Simple_Cell', 'Simple_Row']
     """
     arch_dependencies = {
@@ -1192,4 +1212,4 @@ def ordered_arches(arches: dict[str, Architecture]) -> list[Architecture]:
         ordered_arches.extend(next_arches)
         unresolved_arches -= set(next_arches)
 
-    return [arches[arch_name] for arch_name in ordered_arches]
+    return ordered_arches
