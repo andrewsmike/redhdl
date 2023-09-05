@@ -10,6 +10,7 @@ from antlr4.tree.Tree import ParseTree as ANTLRParseTree
 from antlr4.tree.Trees import Trees
 
 from redhdl.vhdl.antlr_parser import vhdl_tree_from_file, vhdl_tree_from_str
+from redhdl.vhdl.errors import UnexpectedSyntaxError
 from redhdl.vhdl.vhdlParser import vhdlParser
 
 
@@ -308,5 +309,21 @@ def parse_tree_get(
 
 def parse_tree_assert_get(parse_tree: ParseTree, *path: int | str) -> ParseTree:
     node = parse_tree_get(parse_tree, *path)
-    assert node is not None, f"Expected node at path {path}, but found nothing."
+    if node is None:
+        raise UnexpectedSyntaxError(f"Expected node at path {path}, but found nothing.")
+
     return node
+
+
+def get_assert_text(
+    node: ParseTree,
+    error_message: str = "Expected an AST node to have content, but text was missing.",
+) -> str:
+    if node.text is None:
+        raise UnexpectedSyntaxError(error_message)
+    else:
+        return node.text
+
+
+def parse_tree_assert_get_text(parse_tree: ParseTree, *path: int | str) -> str:
+    return get_assert_text(parse_tree_assert_get(parse_tree, *path))

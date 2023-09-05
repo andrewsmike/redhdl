@@ -79,7 +79,8 @@ tmp_ivl_15 and tmp_ivl_24
 from typing import Any, cast
 
 from redhdl.misc.bitrange import BitRange, bitrange_width
-from redhdl.netlist.netlist import Port
+from redhdl.netlist.netlist import Port, PortType
+from redhdl.vhdl.errors import UnexpectedSyntaxError
 from redhdl.vhdl.models import (
     AliasExpr,
     Architecture,
@@ -97,7 +98,9 @@ from redhdl.vhdl.parse_tree import (
     ParseTree,
     called_on_node_type,
     children_of_type,
+    get_assert_text,
     parse_tree_assert_get,
+    parse_tree_assert_get_text,
     parse_tree_from_file,
     parse_tree_get,
     parse_tree_query,
@@ -122,11 +125,12 @@ def explicit_range_bitrange(range_node: ParseTree) -> BitRange:
     (8, 8)
     """
     direction_node = parse_tree_get(range_node, "direction", 0)
-    assert (
-        direction_node is None or direction_node.text == "downto"
-    ), "Expected 'downto' expression, got something else."
+    if (direction_node is not None) and (direction_node.text != "downto"):
+        raise UnexpectedSyntaxError(
+            "When parsing range, expected 'downto' expression, got something else."
+        )
 
-    bound_path = [
+    bound_path: list[int | str] = [
         "term",
         "factor",
         "primary",
@@ -135,12 +139,19 @@ def explicit_range_bitrange(range_node: ParseTree) -> BitRange:
         "abstract_literal",
         0,
     ]
-    upper_bound_str = parse_tree_assert_get(range_node, 0, *bound_path).text
+    upper_bound_str = get_assert_text(
+        parse_tree_assert_get(range_node, 0, *bound_path),
+        "When parsing range, upper bound text was missing.",
+    )
+
     lower_bound_node = parse_tree_get(range_node, 2, *bound_path)
     if lower_bound_node is None:
         lower_bound_str = upper_bound_str
     else:
-        lower_bound_str = lower_bound_node.text
+        lower_bound_str = get_assert_text(
+            lower_bound_node,
+            "When parsing range with apparent lower bound, lower bound text was missing.",
+        )
 
     return (int(lower_bound_str), int(upper_bound_str))
 
@@ -153,10 +164,13 @@ def subtype_indication_bitrange(parse_tree: ParseTree) -> BitRange:
         "identifier",
         0,
     ).text
-    assert signal_type in (
+    if signal_type not in (
         "std_logic",
         "unsigned",
-    ), f"Found unexpected signal_type: {signal_type}."
+    ):
+        raise UnexpectedSyntaxError(
+            f"Found unexpected signal_type: {signal_type}. Expected std_logic or unsigned."
+        )
 
     if signal_type == "std_logic":
         start, stop = 0, 0
@@ -218,18 +232,23 @@ def port_clause_ports(parse_tree: ParseTree) -> dict[str, Port]:
 
     port_declarations = {}
     for declaration_node in port_declaration_nodes:
-        name = parse_tree_assert_get(
+        name = parse_tree_assert_get_text(
             declaration_node, "identifier_list", "identifier", 0
-        ).text
+        )
 
         port_type = parse_tree_assert_get(declaration_node, "signal_mode", 0).text
-        assert port_type in ("in", "out")
+        if port_type not in ("in", "out"):
+            raise UnexpectedSyntaxError(
+                f"Expected port_type to be in/out, found {port_type}."
+            )
 
         bitrange = subtype_indication_bitrange(
             parse_tree_assert_get(declaration_node, "subtype_indication")
         )
 
-        port_declarations[name] = Port(port_type, bitrange_width(bitrange))
+        port_declarations[name] = Port(
+            cast(PortType, port_type), bitrange_width(bitrange)
+        )
 
     return port_declarations
 
@@ -281,16 +300,11 @@ def architecture_ports_entity_declaration(
     parse_tree: ParseTree,
     children_values: list[Any],
 ) -> dict[str, dict[str, Port]]:
-    entity_name_node = parse_tree_assert_get(parse_tree, "identifier", 0)
-    assert (
-        entity_name_node.terminal()
-    ), "Entity name node was expected to be a terminal, but was not."
-    name = entity_name_node.text
-
+    entity_name = parse_tree_assert_get_text(parse_tree, "identifier", 0)
     port_clause = parse_tree_assert_get(parse_tree, "entity_header", "port_clause")
     ports = port_clause_ports(port_clause)
 
-    return {name: ports}
+    return {entity_name: ports}
 
 
 ArchitectureName = str
@@ -328,7 +342,8 @@ def tree_architecture_nodes_architecture_body(
     parse_tree: ParseTree,
     children_values: list[Any],
 ) -> dict[ArchitectureName, ParseTree]:
-    entity_name = parse_tree_assert_get(parse_tree, 3, 0).text
+    entity_name = parse_tree_assert_get_text(parse_tree, 3, 0)
+
     return {entity_name: parse_tree}
 
 
@@ -373,7 +388,7 @@ def const_from_quoted_str(value: str) -> int:
     return int(raw_value, base=base)
 
 
-_index_path = [
+_index_path: list[str | int] = [
     "function_call_or_indexed_name_part",
     "actual_parameter_part",
     "association_list",
@@ -392,14 +407,14 @@ _index_path = [
     "abstract_literal",
 ]
 
-_bitrange_base_path = [
+_bitrange_base_path: list[str | int] = [
     "slice_name_part",
     "discrete_range",
     "range_decl",
     "explicit_range",
 ]
 
-_bitrange_each_index_path = [
+_bitrange_each_index_path: list[str | int] = [
     # There are multiple simple_expressions per explicit_range. Use children_of_type().
     # "simple_expression",
     "term",
@@ -416,7 +431,7 @@ _bitrange_each_index_path = [
 def bitrange_from_name_part(name_part_node: ParseTree) -> BitRange | None:
     index_node = parse_tree_get(name_part_node, *_index_path)
     if index_node is not None:
-        index = int(index_node.children[0].text)
+        index = int(get_assert_text(index_node.children[0]))
         return (index, index)
 
     index_range_base_node = parse_tree_get(name_part_node, *_bitrange_base_path)
@@ -424,7 +439,7 @@ def bitrange_from_name_part(name_part_node: ParseTree) -> BitRange | None:
         raise ValueError("Expected either bit index or bit range, found neither.")
 
     indices = [
-        int(index_node.text)
+        int(get_assert_text(index_node))
         for child in children_of_type(index_range_base_node, "simple_expression")
         if (index_node := parse_tree_get(child, *_bitrange_each_index_path)) is not None
     ]
@@ -501,7 +516,7 @@ def alias_from_term_node(alias_expr_node: ParseTree) -> AliasExpr | None:
     elif len(alias_nodes) == 0:
         return None
 
-    alias_name = parse_tree_get(alias_nodes[0], 0).text
+    alias_name = parse_tree_assert_get_text(alias_nodes[0], 0)
 
     indexing_base_node = parse_tree_get(
         alias_expr_node, *_alias_base_path, "name", "name_part"
@@ -525,22 +540,26 @@ def expr_from_term_node(term_node: ParseTree) -> Expression | None:
     ]
     constant_node = parse_tree_get(term_node, *constant_base_path)
     if constant_node is not None:
+        error_msg = "Could not find quoted constant value."
+
         enum_lit_node = parse_tree_get(constant_node, "enumeration_literal")
         if enum_lit_node is not None:
-            quoted_value_str = parse_tree_get(enum_lit_node, 0).text
+            quoted_value_str: str | None = get_assert_text(
+                parse_tree_assert_get(enum_lit_node, 0),
+                error_msg,
+            )
         else:
-            quoted_value_str = parse_tree_get(constant_node, 0).text
+            quoted_value_str = parse_tree_assert_get(constant_node, 0).text
             if quoted_value_str is None:
-                quoted_value_node = parse_tree_get(
+                quoted_value_node = parse_tree_assert_get(
                     constant_node,
                     "numeric_literal",
                     "abstract_literal",
                     0,
                 )
-                quoted_value_str = quoted_value_node.text
+                quoted_value_str = get_assert_text(quoted_value_node, error_msg)
 
-            if quoted_value_str is None:
-                raise ValueError("Could not find quoted constant value.")
+        assert quoted_value_str is not None  # For MyPy.
 
         return ConstExpr(value=const_from_quoted_str(quoted_value_str))
 
@@ -601,6 +620,8 @@ def expr_from_node(expression_node: ParseTree) -> Expression:
         and all(parse_tree_get(op, "&") is not None for op in adding_ops)
     )
     if is_concat_expr:
+        assert simple_expr_node is not None  # For MyPy.
+
         return ConcatExpr(
             exprs=[
                 expr_from_term_node(child_term_node)
@@ -631,12 +652,12 @@ def association_element_name_slice_expr(
     """
     range_node = parse_tree_get(parse_tree, "formal_part", "explicit_range")
     if range_node is not None:
-        range_value = explicit_range_bitrange(range_node)
+        range_value: BitRange | None = explicit_range_bitrange(range_node)
     else:
         range_value = None
 
     return (
-        parse_tree_assert_get(parse_tree, "formal_part", "identifier", 0).text,
+        parse_tree_assert_get_text(parse_tree, "formal_part", "identifier", 0),
         range_value,
         parse_tree_assert_get(
             parse_tree, "actual_part", "actual_designator", "expression"
@@ -693,12 +714,12 @@ def architecture_subinstances_instantiation_statement(
     parse_tree: ParseTree,
     children_values: list[Any],
 ) -> dict[ArchitectureName, dict[str, ArchitectureSubinstance]]:
-    instance_name = parse_tree_assert_get(
+    instance_name = parse_tree_assert_get_text(
         parse_tree, "label_colon", "identifier", 0
-    ).text
-    entity_type_name = parse_tree_assert_get(
+    )
+    entity_type_name = parse_tree_assert_get_text(
         parse_tree, "instantiated_unit", "name", "identifier", 0
-    ).text
+    )
 
     return {
         "UNKNOWN_ARCH": {
@@ -716,7 +737,7 @@ def architecture_subinstances_architecture_body(
     parse_tree: ParseTree,
     children_values: list[Any],
 ) -> dict[ArchitectureName, dict[str, ArchitectureSubinstance]]:
-    arch_name = parse_tree_assert_get(parse_tree, 3, 0).text  # Identifier
+    arch_name = parse_tree_assert_get_text(parse_tree, 3, 0)  # Identifier
 
     results: dict[ArchitectureName, dict[str, ArchitectureSubinstance]] = {}
     for child_value in children_values:
@@ -737,7 +758,7 @@ def identifier_list_strs(identifier_list_node: ParseTree) -> list[str]:
     ['a', 'b']
     """
     return list(
-        parse_tree_assert_get(identifier_node, 0).text
+        parse_tree_assert_get_text(identifier_node, 0)
         for identifier_node in children_of_type(identifier_list_node, "identifier")
     )
 
@@ -810,7 +831,7 @@ def architecture_local_var_bitrange_architecture_body(
     parse_tree: ParseTree,
     children_values: list[Any],
 ) -> dict[ArchitectureName, dict[str, BitRange]]:
-    arch_name = parse_tree_assert_get(parse_tree, 3, 0).text  # Identifier
+    arch_name = parse_tree_assert_get_text(parse_tree, 3, 0)  # Identifier
 
     results: dict[ArchitectureName, dict[str, BitRange]] = {}
     for child_value in children_values:
@@ -828,9 +849,9 @@ def architecture_local_var_bitrange_architecture_body(
 def name_node_str(name_node: ParseTree) -> str:
     ident_node = parse_tree_assert_get(name_node, 0)
     if ident_node.node_type == "STRING_LITERAL":
-        return ident_node.text
+        return get_assert_text(ident_node)
     elif ident_node.node_type == "identifier":
-        return parse_tree_assert_get(ident_node, 0).text
+        return parse_tree_assert_get_text(ident_node, 0)
     else:
         raise ValueError(
             "Failed to parse identifier. First node of 'name' wasn't STRING_LITERAL "
@@ -985,7 +1006,7 @@ def architecture_var_assignments_architecture_body(
     parse_tree: ParseTree,
     children_values: list[Any],
 ) -> dict[ArchitectureName, dict[str, dict[BitRange | None, Expression]]]:
-    arch_name = parse_tree_assert_get(parse_tree, 3, 0).text  # Identifier
+    arch_name = parse_tree_assert_get_text(parse_tree, 3, 0)  # Identifier
 
     results: dict[ArchitectureName, dict[str, dict[BitRange | None, Expression]]] = {}
     for child_vars in children_values:
