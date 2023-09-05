@@ -276,17 +276,10 @@ class BussingPlacementProblem(LocalSearchProblem[InstancePlacement]):
             )
 
 
-def assembled_circuit_schem(
-    instance_config: dict[InstanceId, InstanceConfig],
-    network_specs: NetworkSpecs,
+def schematic_placement_from_netlist(
+    netlist: Netlist,
     debug: bool = False,
-) -> Schematic:
-    netlist = netlist_from_simple_spec(
-        instance_config=instance_config,
-        network_specs=network_specs,
-        output_port_bitwidths={"out": 8},
-    )
-
+) -> tuple[Schematic, InstancePlacement]:
     def solution_schematic(placement: InstancePlacement) -> Schematic:
         pin_buses = dest_pin_buses(netlist, placement)
         # print(f"Collision count: {collision_count(pin_buses)}")
@@ -316,15 +309,29 @@ def assembled_circuit_schem(
         rounds_per_checkpoint=1,
         checkpoint_func=checkpoint,
     )
+
     print(f"Best cost: {placement_problem.solution_cost(placement)}")
 
     try:
-        return solution_schematic(placement)
+        return solution_schematic(placement), placement
     except BaseException:
         import pdb
 
         pdb.set_trace()
         raise
+
+
+def assembled_circuit_schem(
+    instance_config: dict[InstanceId, InstanceConfig],
+    network_specs: NetworkSpecs,
+    debug: bool = False,
+) -> Schematic:
+    netlist = netlist_from_simple_spec(
+        instance_config=instance_config,
+        network_specs=network_specs,
+        output_port_bitwidths={"out": 8},
+    )
+    return schematic_placement_from_netlist(netlist, debug=debug)[0]
 
 
 def main():

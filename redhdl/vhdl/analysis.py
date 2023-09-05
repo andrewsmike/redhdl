@@ -13,9 +13,6 @@ Boil iverlog-generated vHDL files down to a set of netlist-like Architecture obj
                              var_bitrange_assignments={'C': {(0, 0): ...},...}),
  'Simple_Row': Architecture(...)}
 
->>> print(ordered_arches(arches))
-['Simple_Cell', 'Simple_Row']
-
 
 # Architecture field details
 Below are the helpers that are used to populate Architecture fields. These fully specify
@@ -79,11 +76,23 @@ dict_keys([None])
 >>> print(str_from_parse_tree(var_assignments["C"][None].expr))
 tmp_ivl_15 and tmp_ivl_24
 """
-from dataclasses import dataclass
-from pprint import pformat
 from typing import Any, cast
 
+from redhdl.bitrange import BitRange, bitrange_width
 from redhdl.netlist import Port
+from redhdl.vhdl.models import (
+    AliasExpr,
+    Architecture,
+    ArchitectureSubinstance,
+    ConcatExpr,
+    CondExpr,
+    ConstExpr,
+    Expression,
+    SimpleExpr,
+    UnconditionalExpr,
+    assignments_with_resolved_bitranges,
+    subinstances_with_resolved_port_bitranges,
+)
 from redhdl.vhdl.parse_tree import (
     ParseTree,
     called_on_node_type,
@@ -93,8 +102,6 @@ from redhdl.vhdl.parse_tree import (
     parse_tree_get,
     parse_tree_query,
 )
-
-BitRange = tuple[int, int]
 
 
 @called_on_node_type("explicit_range")
@@ -136,15 +143,6 @@ def explicit_range_bitrange(range_node: ParseTree) -> BitRange:
         lower_bound_str = lower_bound_node.text
 
     return (int(lower_bound_str), int(upper_bound_str))
-
-
-def bitrange_width(bitrange: BitRange) -> int:
-    start, stop = bitrange
-    return stop - start + 1
-
-
-def port_bitrange(port: Port) -> BitRange:
-    return (0, port.pin_count - 1)
 
 
 @called_on_node_type("subtype_indication")
@@ -332,45 +330,6 @@ def tree_architecture_nodes_architecture_body(
 ) -> dict[ArchitectureName, ParseTree]:
     entity_name = parse_tree_assert_get(parse_tree, 3, 0).text
     return {entity_name: parse_tree}
-
-
-@dataclass
-class ArchitectureSubinstance:
-    instance_name: str
-    entity_name: str
-    port_exprs: dict[tuple[str, BitRange | None], ParseTree]
-
-
-@dataclass
-class ConstExpr:
-    value: int
-
-
-@dataclass
-class AliasExpr:
-    var_name: str
-    bitrange: BitRange | None
-
-
-@dataclass
-class ConcatExpr:
-    exprs: list[AliasExpr | ConstExpr]
-
-
-@dataclass
-class SimpleExpr:
-    expr: ParseTree
-
-
-UnconditionalExpr = SimpleExpr | ConstExpr | AliasExpr | ConcatExpr
-
-
-@dataclass
-class CondExpr:
-    conditions: list[tuple[UnconditionalExpr | None, UnconditionalExpr | None]]
-
-
-Expression = UnconditionalExpr | CondExpr
 
 
 def const_from_quoted_str(value: str) -> int:
@@ -1043,88 +1002,6 @@ def architecture_var_assignments_architecture_body(
     return results
 
 
-@dataclass
-class Architecture:
-    name: str
-
-    ports: dict[str, Port]
-    subinstances: dict[str, ArchitectureSubinstance]
-    var_bitranges: dict[str, BitRange]
-    var_bitrange_assignments: dict[str, dict[BitRange, Expression]]
-
-    @property
-    def dependencies(self) -> set[str]:
-        return {subinstance.entity_name for subinstance in self.subinstances.values()}
-
-
-def with_resolved_port_bitranges(
-    subinstances: dict[str, ArchitectureSubinstance],
-    arch_ports: dict[str, dict[str, Port]],
-) -> dict[str, ArchitectureSubinstance]:
-
-    undeclared_ports = {
-        port_name
-        for subinst in subinstances.values()
-        for (port_name, _) in subinst.port_exprs.keys()
-        if port_name not in arch_ports.get(subinst.entity_name, {})
-    }
-    if any(undeclared_ports):
-        raise ValueError(
-            f"No entity port declaration for {undeclared_ports}; can't resolve port "
-            + "assignment bitwidths."
-        )
-
-    return {
-        subinst_name: ArchitectureSubinstance(
-            instance_name=subinst.instance_name,
-            entity_name=subinst.entity_name,
-            port_exprs={
-                (
-                    port_name,
-                    (
-                        bitrange
-                        if bitrange is not None
-                        else port_bitrange(arch_ports[subinst.entity_name][port_name])
-                    ),
-                ): expr
-                for (port_name, bitrange), expr in subinst.port_exprs.items()
-            },
-        )
-        for subinst_name, subinst in subinstances.items()
-    }
-
-
-def with_resolved_bitranges(
-    var_bitrange_assignments: dict[str, dict[BitRange | None, Expression]],
-    var_bitranges: dict[str, BitRange],
-    ports: dict[str, Port],
-) -> dict[str, dict[BitRange, Expression]]:
-    all_bitranges = var_bitranges | {
-        port_name: port_bitrange(port) for port_name, port in ports.items()
-    }
-    undeclared_variables = {
-        var_name
-        for var_name in var_bitrange_assignments.keys()
-        if var_name not in all_bitranges
-    }
-    if any(undeclared_variables):
-        raise ValueError(
-            f"Variables {undeclared_variables} isn't a port or declared variable, "
-            + "can't resolve bitwidth."
-        )
-
-    return {
-        var_name: {
-            cast(
-                BitRange,
-                (bitrange if bitrange is not None else all_bitranges[var_name]),
-            ): assignment
-            for bitrange, assignment in bitrange_assignments.items()
-        }
-        for var_name, bitrange_assignments in var_bitrange_assignments.items()
-    }
-
-
 def arches_from_vhdl_path(vhdl_path: str) -> dict[str, Architecture]:
     """
     >>> arches = arches_from_vhdl_path("hdl_examples/simple/Simple.vhdl")
@@ -1158,12 +1035,12 @@ def arches_from_vhdl_path(vhdl_path: str) -> dict[str, Architecture]:
         arch_name: Architecture(
             name=arch_name,
             ports=(ports := arch_ports.get(arch_name, {})),
-            subinstances=with_resolved_port_bitranges(
+            subinstances=subinstances_with_resolved_port_bitranges(
                 arch_subinstances.get(arch_name, {}),
                 arch_ports,
             ),
             var_bitranges=(var_bitranges := arch_var_bitranges.get(arch_name, {})),
-            var_bitrange_assignments=with_resolved_bitranges(
+            var_bitrange_assignments=assignments_with_resolved_bitranges(
                 arch_assignments.get(arch_name, {}),
                 var_bitranges,
                 ports=ports,
@@ -1171,45 +1048,3 @@ def arches_from_vhdl_path(vhdl_path: str) -> dict[str, Architecture]:
         )
         for arch_name in arch_names
     }
-
-
-def ordered_arches(arches: dict[str, Architecture]) -> list[str]:
-    """
-    Using subinstance entity types, determine the correct architecture build order.
-
-    Unordered by default:
-    >>> arches = arches_from_vhdl_path("hdl_examples/simple/Simple.vhdl")
-    >>> type(arches)
-    <class 'dict'>
-
-    >>> ordered_arches(arches)
-    ['Simple_Cell', 'Simple_Row']
-    """
-    arch_dependencies = {
-        arch_name: arch.dependencies for arch_name, arch in arches.items()
-    }
-
-    specified_arches = set(arches.keys())
-
-    ordered_arches = []
-
-    # All unspecified arches are assumed to be preexisting and resolved elsewhere.
-    unresolved_arches = set(specified_arches)
-    while unresolved_arches:
-        next_arches = sorted(
-            arch
-            for arch in unresolved_arches
-            if len(arch_dependencies[arch] & unresolved_arches) == 0
-        )
-        if not next_arches:
-            raise ValueError(
-                "Failed to resolve architecture evaluation order: There must be a cycle."
-                + pformat(
-                    {"unresolved": unresolved_arches, "dependencies": arch_dependencies}
-                )
-            )
-
-        ordered_arches.extend(next_arches)
-        unresolved_arches -= set(next_arches)
-
-    return ordered_arches
