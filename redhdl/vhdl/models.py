@@ -7,8 +7,13 @@ from dataclasses import dataclass
 from pprint import pformat
 from typing import cast
 
-from redhdl.bitrange import BitRange, bitranges_equal, bitranges_valid, port_bitrange
-from redhdl.netlist import Port
+from redhdl.misc.bitrange import (
+    BitRange,
+    bitranges_equal,
+    bitranges_valid,
+    port_bitrange,
+)
+from redhdl.netlist.netlist import Port
 from redhdl.vhdl.errors import (
     InvalidAssignmentBitrangeError,
     UnsupportedAssignmentExprError,
@@ -20,21 +25,37 @@ from redhdl.vhdl.parse_tree import ParseTree, str_from_parse_tree
 class ConstExpr:
     value: int
 
+    def __str__(self):
+        return f"ConstExpr({self.value})"
+
 
 @dataclass
 class AliasExpr:
     var_name: str
     bitrange: BitRange | None
 
+    def __str__(self):
+        if self.bitrange is not None:
+            start, end = self.bitrange
+            return f"AliasExpr({self.var_name} ({start} downto {end}))"
+        else:
+            return f"AliasExpr({self.var_name})"
+
 
 @dataclass
 class ConcatExpr:
     exprs: list[AliasExpr | ConstExpr]
 
+    def __str__(self):
+        return f"SimpleExpr(expr='{str_from_parse_tree(self.expr)}')"
+
 
 @dataclass
 class SimpleExpr:
     expr: ParseTree
+
+    def __str__(self):
+        return f"SimpleExpr(expr='{str_from_parse_tree(self.expr)}')"
 
 
 UnconditionalExpr = SimpleExpr | ConstExpr | AliasExpr | ConcatExpr
@@ -43,6 +64,9 @@ UnconditionalExpr = SimpleExpr | ConstExpr | AliasExpr | ConcatExpr
 @dataclass
 class CondExpr:
     conditions: list[tuple[UnconditionalExpr | None, UnconditionalExpr | None]]
+
+    def __str__(self):
+        return f"CondExpr({pformat(self.conditions)})"
 
 
 Expression = UnconditionalExpr | CondExpr
@@ -65,7 +89,7 @@ def validate_assignment_bitrange_expr(
     ]:
         if isinstance(expr, unsupported_expr_cls):
             raise UnsupportedAssignmentExprError(
-                f"[{path}] {name} expressions aren't yet supported: {str_from_parse_tree(expr)}."
+                f"[{path}] {name} expressions aren't yet supported: {expr}."
             )
 
 
@@ -73,7 +97,7 @@ def validate_assignment_bitrange_expr(
 class ArchitectureSubinstance:
     instance_name: str
     entity_name: str
-    port_exprs: dict[tuple[str, BitRange | None], ParseTree]
+    port_exprs: dict[tuple[str, BitRange | None], Expression]
 
     def validate_resolved(self, arch_ports: dict[str, dict[str, Port]]):
         for (port_name, bitrange), port_expr in self.port_exprs.items():

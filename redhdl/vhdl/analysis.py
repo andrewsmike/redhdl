@@ -78,8 +78,8 @@ tmp_ivl_15 and tmp_ivl_24
 """
 from typing import Any, cast
 
-from redhdl.bitrange import BitRange, bitrange_width
-from redhdl.netlist import Port
+from redhdl.misc.bitrange import BitRange, bitrange_width
+from redhdl.netlist.netlist import Port
 from redhdl.vhdl.models import (
     AliasExpr,
     Architecture,

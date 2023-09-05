@@ -3,10 +3,8 @@ from math import log2
 from pprint import pformat, pprint
 from random import seed
 
-from redhdl.bussing import BussingError
-from redhdl.caching import first_id_cached
-from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
-from redhdl.naive_bussing import (
+from redhdl.assembly.bussing import BussingError
+from redhdl.assembly.naive_bussing import (
     PartialPinBuses,
     avg_min_redstone_bus_len_score,
     bussed_placement_schematic,
@@ -22,15 +20,7 @@ from redhdl.naive_bussing import (
     pin_pair_straight_up_pct,
     stride_aligned_bus_pct,
 )
-from redhdl.netlist import InstanceId, Netlist
-from redhdl.netlist_template import (
-    InstanceConfig,
-    NetworkSpecs,
-    example_instance_configs,
-    example_network_specs,
-    netlist_from_simple_spec,
-)
-from redhdl.placement import (
+from redhdl.assembly.placement import (
     InstancePlacement,
     avg_instance_padding_blocks,
     mutated_placement,
@@ -39,7 +29,20 @@ from redhdl.placement import (
     placement_schematic,
     placement_valid,
 )
-from redhdl.schematic import Schematic, interactive_display_schematic, save_schem
+from redhdl.misc.caching import first_id_cached
+from redhdl.netlist.netlist import InstanceId, Netlist
+from redhdl.netlist.netlist_template import (
+    InstanceConfig,
+    NetworkSpecs,
+    example_instance_configs,
+    example_network_specs,
+    netlist_from_simple_spec,
+)
+from redhdl.search.local_search import (
+    LocalSearchProblem,
+    sim_annealing_searched_solution,
+)
+from redhdl.voxel.schematic import Schematic, interactive_display_schematic, save_schem
 
 
 def _weighted_costs(

@@ -65,8 +65,9 @@ Netlist(instances={'and': SchematicInstance(...),
 """
 from typing import cast
 
-from redhdl.instance_template import schematic_instance_from_schem
-from redhdl.netlist import (
+from redhdl.misc.slice import Slice
+from redhdl.netlist.instance_template import schematic_instance_from_schem
+from redhdl.netlist.netlist import (
     Instance,
     InstanceId,
     Netlist,
@@ -75,8 +76,7 @@ from redhdl.netlist import (
     Port,
     PortId,
 )
-from redhdl.schematic import load_schem
-from redhdl.slice import Slice
+from redhdl.voxel.schematic import load_schem
 
 InstanceConfig = dict[str, str | int]
 

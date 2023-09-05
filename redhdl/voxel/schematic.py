@@ -49,8 +49,8 @@ from nbtlib import load
 from nbtlib.tag import ByteArray, Compound, Int, Short
 import numpy as np
 
-from redhdl.positional_data import PositionalData, PositionMask
-from redhdl.region import (
+from redhdl.voxel.positional_data import PositionalData, PositionMask
+from redhdl.voxel.region import (
     X_AXIS_INDEX,
     Y_AXIS_INDEX,
     Z_AXIS_INDEX,

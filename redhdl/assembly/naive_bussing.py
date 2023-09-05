@@ -2,9 +2,7 @@ from functools import reduce
 from math import log2
 import operator
 
-from redhdl.caching import first_id_cached
-from redhdl.netlist import Netlist, PinId
-from redhdl.placement import (
+from redhdl.assembly.placement import (
     InstancePlacement,
     placement_pin_seq_points,
     placement_region,
@@ -12,13 +10,15 @@ from redhdl.placement import (
     source_dest_pin_id_seq_pairs,
     source_dest_pin_pos_pairs,
 )
-from redhdl.redstone_bussing import (
+from redhdl.assembly.redstone_bussing import (
     RedstoneBussing,
     min_redstone_bussing_cost,
     redstone_bussing,
 )
-from redhdl.region import CompositeRegion, Pos, RectangularPrism
-from redhdl.schematic import Schematic
+from redhdl.misc.caching import first_id_cached
+from redhdl.netlist.netlist import Netlist, PinId
+from redhdl.voxel.region import CompositeRegion, Pos, RectangularPrism
+from redhdl.voxel.schematic import Schematic
 
 PinBuses = dict[PinId, RedstoneBussing]
 PartialPinBuses = dict[PinId, RedstoneBussing | None]

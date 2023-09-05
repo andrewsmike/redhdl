@@ -4,8 +4,8 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, replace
 from typing import Mapping
 
-from redhdl.netlist import Instance, PortName, PortType
-from redhdl.region import (
+from redhdl.netlist.netlist import Instance, PortName, PortType
+from redhdl.voxel.region import (
     Direction,
     Pos,
     PositionSequence,
@@ -13,7 +13,7 @@ from redhdl.region import (
     direction_unit_pos,
     xz_direction_y_rotated,
 )
-from redhdl.schematic import Schematic
+from redhdl.voxel.schematic import Schematic
 
 
 class PortInterface(metaclass=ABCMeta):

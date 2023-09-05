@@ -72,7 +72,7 @@ from typing import (
     overload,
 )
 
-from redhdl.slice import Slice
+from redhdl.misc.slice import Slice
 
 Axis = Literal["x", "y", "z"]
 axes = cast(list[Axis], ["x", "y", "z"])

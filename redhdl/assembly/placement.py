@@ -17,11 +17,14 @@ from typing import Iterable, cast
 from frozendict import frozendict
 from tqdm import tqdm
 
-from redhdl.caching import first_id_cached
-from redhdl.instances import SchematicInstance
-from redhdl.local_search import LocalSearchProblem, sim_annealing_searched_solution
-from redhdl.netlist import InstanceId, Netlist, PinId, PinIdSequence
-from redhdl.region import (
+from redhdl.misc.caching import first_id_cached
+from redhdl.netlist.instances import SchematicInstance
+from redhdl.netlist.netlist import InstanceId, Netlist, PinId, PinIdSequence
+from redhdl.search.local_search import (
+    LocalSearchProblem,
+    sim_annealing_searched_solution,
+)
+from redhdl.voxel.region import (
     CompositeRegion,
     Direction,
     PointRegion,
@@ -35,7 +38,7 @@ from redhdl.region import (
     random_pos,
     xz_directions,
 )
-from redhdl.schematic import Schematic
+from redhdl.voxel.schematic import Schematic
 
 InstancePlacement = frozendict[InstanceId, tuple[Pos, Direction]]
 

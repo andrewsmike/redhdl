@@ -126,12 +126,12 @@ from typing import Any, Literal, NamedTuple, Optional, cast
 
 from frozendict import frozendict
 
-from redhdl.bussing import (
+from redhdl.assembly.bussing import (
     BussingImpossibleError,
     BussingLogicError,
     BussingTimeoutError,
 )
-from redhdl.path_search import (
+from redhdl.search.path_search import (
     AlgoTraceStep,
     NoSolutionError,
     PathSearchProblem,
@@ -139,8 +139,8 @@ from redhdl.path_search import (
     TracedPathSearchProblem,
     a_star_bfs_searched_solution,
 )
-from redhdl.positional_data import PositionalData
-from redhdl.region import (
+from redhdl.voxel.positional_data import PositionalData
+from redhdl.voxel.region import (
     Axis,
     Direction,
     Pos,
@@ -154,7 +154,7 @@ from redhdl.region import (
     xz_directions,
     zero_pos,
 )
-from redhdl.schematic import Block, BlockColor, Schematic, block_colors
+from redhdl.voxel.schematic import Block, BlockColor, Schematic, block_colors
 
 logger = getLogger(__name__)
 logger.setLevel("INFO")

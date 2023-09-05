@@ -93,8 +93,8 @@ from typing import Any, Literal, Optional
 
 from frozendict import frozendict
 
-from redhdl.ascii_dag import draw
-from redhdl.slice import Slice
+from redhdl.misc.ascii_dag import draw
+from redhdl.misc.slice import Slice
 
 PortType = Literal["in", "out"]
 

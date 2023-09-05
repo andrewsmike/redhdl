@@ -83,10 +83,14 @@ SchematicInstance(ports={'in': Port(port_type='in', pin_count=8),
 from re import match
 from typing import Dict, cast
 
-from redhdl.instances import PortPlacement, RepeaterPortInterface, SchematicInstance
-from redhdl.netlist import Port, PortType
-from redhdl.positional_data import PositionalData
-from redhdl.region import (
+from redhdl.netlist.instances import (
+    PortPlacement,
+    RepeaterPortInterface,
+    SchematicInstance,
+)
+from redhdl.netlist.netlist import Port, PortType
+from redhdl.voxel.positional_data import PositionalData
+from redhdl.voxel.region import (
     Direction,
     Pos,
     PositionSequence,
@@ -94,7 +98,7 @@ from redhdl.region import (
     direction_unit_pos,
     opposite_direction,
 )
-from redhdl.schematic import Schematic
+from redhdl.voxel.schematic import Schematic
 
 
 def glass_corner_positions(schem: Schematic) -> tuple[Pos, Pos]:

@@ -3,7 +3,7 @@ Positional data: 3d cell (meta)data manipulations.
 """
 from typing import TypeVar
 
-from redhdl.region import PointRegion, Pos, RectangularPrism, Region
+from redhdl.voxel.region import PointRegion, Pos, RectangularPrism, Region
 
 PositionMask = set[Pos] | Region
 

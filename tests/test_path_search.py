@@ -4,8 +4,7 @@ from time import time
 from typing import Generic, Literal
 from unittest.mock import patch
 
-from redhdl.region import Direction, Pos, direction_unit_pos, xz_directions
-from redhdl.path_search import (
+from redhdl.search.path_search import (
     Action,
     PathSearchProblem,
     State,
@@ -13,6 +12,7 @@ from redhdl.path_search import (
     a_star_bfs_searched_solution,
     a_star_iddfs_searched_solution,
 )
+from redhdl.voxel.region import Direction, Pos, direction_unit_pos, xz_directions
 
 
 @dataclass(frozen=True)

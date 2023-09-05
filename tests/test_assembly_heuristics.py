@@ -2,18 +2,18 @@ from frozendict import frozendict
 from pprint import pprint
 from pytest import mark
 
-from redhdl.assembly import (
+from redhdl.assembly.assembly import (
     unbussable_placement_heuristic_costs,
     _unbussable_placement_heuristic_weights,
     _weighted_costs,
 )
-from redhdl.netlist_template import (
+from redhdl.netlist.netlist_template import (
     example_instance_configs,
     example_network_specs,
     netlist_from_simple_spec,
 )
-from redhdl.placement import display_placement
-from redhdl.region import Pos
+from redhdl.voxel.placement import display_placement
+from redhdl.voxel.region import Pos
 
 """
 Vertically and horizontally misaligned:
