@@ -1,4 +1,4 @@
-"""Generic bussing concepts used by naive_bussing and redstone_bussing."""
+"""Bussing error types."""
 
 
 class BussingError(BaseException):

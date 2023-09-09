@@ -1,7 +1,7 @@
 from time import time
 
-from redhdl.assembly.bussing import BussingTimeoutError
-from redhdl.assembly.redstone_bussing import *
+from redhdl.bussing.errors import BussingTimeoutError
+from redhdl.bussing.redstone_bussing import *
 
 
 def test_search_durations():

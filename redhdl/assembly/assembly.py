@@ -3,8 +3,17 @@ from math import log2
 from pprint import pformat, pprint
 from random import seed
 
-from redhdl.assembly.bussing import BussingError
-from redhdl.assembly.naive_bussing import (
+from redhdl.assembly.placement import (
+    InstancePlacement,
+    avg_instance_padding_blocks,
+    mutated_placement,
+    netlist_random_placement,
+    placement_compactness_score,
+    placement_schematic,
+    placement_valid,
+)
+from redhdl.bussing.errors import BussingError
+from redhdl.bussing.naive_bussing import (
     PartialPinBuses,
     avg_min_redstone_bus_len_score,
     bussed_placement_schematic,
@@ -19,15 +28,6 @@ from redhdl.assembly.naive_bussing import (
     pin_pair_interrupted_line_of_sight_pct,
     pin_pair_straight_up_pct,
     stride_aligned_bus_pct,
-)
-from redhdl.assembly.placement import (
-    InstancePlacement,
-    avg_instance_padding_blocks,
-    mutated_placement,
-    netlist_random_placement,
-    placement_compactness_score,
-    placement_schematic,
-    placement_valid,
 )
 from redhdl.misc.caching import first_id_cached
 from redhdl.netlist.netlist import InstanceId, Netlist

@@ -10,7 +10,7 @@ from redhdl.assembly.placement import (
     source_dest_pin_id_seq_pairs,
     source_dest_pin_pos_pairs,
 )
-from redhdl.assembly.redstone_bussing import (
+from redhdl.bussing.redstone_bussing import (
     RedstoneBussing,
     min_redstone_bussing_cost,
     redstone_bussing,

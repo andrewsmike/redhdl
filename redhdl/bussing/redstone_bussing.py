@@ -73,7 +73,7 @@ Schematic(pos_blocks={Pos(0, -1, 0): Block(block_type='minecraft:..._wool',
           pos_sign_lines={})
 
 The minimal bus has a traverse element, and an ascend element:
->>> from redhdl.region import display_regions
+>>> from redhdl.voxel.region import display_regions
 >>> display_regions(schem.pos_blocks.mask())  # doctest: +NORMALIZE_WHITESPACE
 Y  [(0, 2)]
    1
@@ -95,7 +95,7 @@ Y  [(0, 3)]
 
 >>> from math import floor
 >>> from time import time
->>> from redhdl.schematic import save_schem
+>>> from redhdl.voxel.schematic import save_schem
 >>> for i, (start_pos, end_pos) in enumerate([  # doctest: +NORMALIZE_WHITESPACE
 ...     (Pos(0, 0, 0), Pos(3, 2, 2)),
 ...     (Pos(0, 0, 0), Pos(0, 4, 3)),
@@ -126,7 +126,7 @@ from typing import Any, Literal, NamedTuple, Optional, cast
 
 from frozendict import frozendict
 
-from redhdl.assembly.bussing import (
+from redhdl.bussing.errors import (
     BussingImpossibleError,
     BussingLogicError,
     BussingTimeoutError,

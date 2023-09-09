@@ -33,48 +33,64 @@ There are multiple conceptual stacks this codebase must build and unify:
 - vHDL parsing and translation into a Netlist.
 
 
-Quick tour, building upwards
-----------------------------
+Architecture
+------------
 
-Generic utilities:
-- slice.py: Provides Slice(), which is slice() but hashable.
-- ascii_dag.py: ASCII-art directed acyclic graph pretty printer.
+- redhdl.voxel: 3d data primitives and minecraft schematics.
+- redhdl.search: Local and graph search algorithms.
+- redhdl.vhdl: VHDL parsing and analysis.
+- redhdl.netlist: Abstract circuit representation. Includes tools to generate netlists from schematics and VHDL files.
+- redhdl.misc: Generic utilities and data types (such as custom caching, slicing, bitranges, etc).
+- redhdl.bussing: Generate 3d busses for redstone circuits.
+- redhdl.assembly: Putting it all together: synthesizing circuits using the previous modules' tooling.
+
+
+### Detailed architecture
+
+Misc. utilities:
+- misc/ascii_dag.py: ASCII-art directed acyclic graph pretty printer.
+- misc/caching.py: Custom caching decorators.
+- misc/bitrange.py: Bit-range manipulation module.
+- misc/slice.py: Provides Slice(), which is slice() but hashable.
 
 Spatial stuff:
-- region.py: Positions in 3d space, regions (point/rectangular/compound), position sequences.
-- positional_data.py: Fancy Dict[Pos, T] with helper tools.
-- schematic.py: Basic Block and Schematic representation, loading / saving.
+- voxel/positional_data.py: Fancy Dict[Pos, T] with helper tools.
+- voxel/region.py: Positions in 3d space, regions (point/rectangular/compound), position sequences.
+- voxel/schematic.py: Basic Block and Schematic representation, loading / saving.
+
+vHDL stuff:
+- vhdl/parse_tree.py: ANTLR AST harness and simplified AST tools, representation.
+- vhdl/models.py: Simplified netlist-adjacent model of a VHDL file plus manipulations.
+- vhdl/analysis.py: Mapping from AST to simpler models.py models.
 
 Netlist stuff:
-- netlist.py: Somewhat abstract Netlist, Interface, Port, Pin, PinSequence definitions.
-- instances.py: Concrete schematic-based Instance (and RepeaterPortInterface).
-- instance_template.py: Parse a carefully-formatted circuit schematic into an Instance.
+- netlist/netlist.py: Somewhat abstract Netlist, Interface, Port, Pin, PinSequence definitions.
+- netlist/instances.py: Concrete schematic-based Instance (and RepeaterPortInterface).
+- netlist/instance_template.py: Parse a carefully-formatted circuit schematic into an Instance.
     Searches for I/O annotating sign blocks and parses out descriptions for Ports / Pins / etc.
-- netlist_template.py: Make Netlists using simple templates and a schematic library!
+- netlist/netlist_template.py: Create Netlists from simple templates and a schematic library!
+- netlist/vhdl_netlist.py: Create Netlists from simple VHDL files!
 
 Search stuff:
-- path_search.py: Path search algorithm, Problem interface and A* implementation.
-- local_search.py: Local search algorithm, Problem interfaces and sim. annealing implementation.
+- search/local_search.py: Local search algorithm, Problem interfaces and sim. annealing implementation.
+- search/path_search.py: Path search algorithm, Problem interface and A* implementation.
 
 Bussing:
-- bussing.py: Heuristic simple pathfinding problem methods.
+- bussing/errors.py: Bussing error types.
+- bussing/naive_bussing.py: Heuristic simple pathfinding problem methods.
     - Only routes a single block path, rather than a real redstone wire.
     - Has a variety of useful cost heuristics and Path definitions.
     - Has a collision-relaxed solver for searching multiple paths simultaneously.
-- redstone_bussing.py: Experimental fully-featured redstone wire path search problem.
+- bussing/redstone_bussing.py: Experimental fully-featured redstone wire path search problem.
 
-Putting it all together
------------------------
-- placement.py: Bussing-naive component placement logic and solvers.
+Assembly:
+- assembly/placement.py: Bussing-naive component placement logic and solvers.
     - Placement definition (A Dict[InstanceId, Tuple[Position, Direction]])
     - (Placement U Netlist) methods (including Schematic generation)
     - Pin position localization tools
     - Placement search methods (random and sim. annealing)
     - Placement quality heuristics
-- assembly.py: Heuristic joint placement and (naive-wire-only) bus search.
-
-vHDL stuff:
-- vhdl/*: Basic AST available, synthesized hierarchical Netlist not implemented yet.
+- assembly/assembly.py: Heuristic joint placement and (naive-wire-only) bus search.
 
 
 WHAT'S MISSING:
