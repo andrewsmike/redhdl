@@ -202,7 +202,7 @@ def fully_order_steps():
             ("__ge__", lambda self, other: cmp_key(self) >= cmp_key(other)),
         ]:
             stack.enter_context(
-                patch(f"redhdl.path_search.Step.{patch_func_name}", patch_func)
+                patch(f"redhdl.search.path_search.Step.{patch_func_name}", patch_func)
             )
 
         yield

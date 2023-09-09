@@ -38,7 +38,7 @@ Concepts:
     to construct complex circuits. Netlist inherits from Instance.
 
 
->>> from redhdl.netlist import example_adder_instance
+>>> from redhdl.netlist.netlist import example_adder_instance
 >>> pprint(example_adder_instance)
 ExampleInstanceType(ports={'a': Port(port_type='in', pin_count=4),
                            'b': Port(port_type='in', pin_count=4),
@@ -52,7 +52,7 @@ ExampleInstanceType(ports={'a': Port(port_type='in', pin_count=4),
                              'type': 'adder'})
 
 
->>> from redhdl.netlist import example_netlist
+>>> from redhdl.netlist.netlist import example_netlist
 >>> pprint(example_netlist, width=120)
 Netlist(instances={'adder': ExampleInstanceType(...),
                    'constant_a': ExampleInstanceType(ports={'out': Port(port_type='out', pin_count=4)},
@@ -332,7 +332,7 @@ class Netlist:
         """
         The I/O ports for a given Netlist.
 
-        >>> from redhdl.netlist import example_netlist
+        >>> from redhdl.netlist.netlist import example_netlist
         >>> pprint(example_netlist.io_ports())
         {'out': Port(port_type='out', pin_count=4)}
         """

@@ -20,7 +20,7 @@ Port describing signs:
 - All other lines are currently ignored. They could be used to encode more
     sophisticated bus connecter logic.
 
->>> from redhdl.schematic import load_schem
+>>> from redhdl.voxel.schematic import load_schem
 >>> schem = load_schem("schematic_examples/hdl_diagonal_not.schem")
 >>> pprint(schem)
 Schematic(pos_blocks={Pos(0, 0, 0): Block(block_type='minecraft:oak_wall_sign',

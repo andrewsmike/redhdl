@@ -8,7 +8,7 @@ Region types:
 - Potential future add: Diagonal polyhedra for diagonal circuits.
 
 Example usages:
->>> from redhdl.region import CompositeRegion, RectangularPrism
+>>> from redhdl.voxel.region import CompositeRegion, RectangularPrism
 
 >>> example = RectangularPrism(Pos(0, 0, 0), Pos(2, 3, 4))
 >>> continuing_with_overlap = RectangularPrism(Pos(2, 3, 4), Pos(3, 4, 5))
