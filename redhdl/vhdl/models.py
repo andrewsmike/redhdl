@@ -97,26 +97,22 @@ def validate_assignment_bitrange_expr(
 class ArchitectureSubinstance:
     instance_name: str
     entity_name: str
-    port_exprs: dict[tuple[str, BitRange | None], Expression]
+    port_exprs: dict[str, dict[BitRange | None, Expression]]
 
     def validate_resolved(self, arch_ports: dict[str, dict[str, Port]]):
-        for (port_name, bitrange), port_expr in self.port_exprs.items():
+        for port_name, bitrange_exprs in self.port_exprs.items():
             path = f"{self.entity_name}@{self.instance_name}.{port_name}"
 
-            validate_assignment_bitrange_expr(path, bitrange, port_expr)
+            for bitrange, expr in bitrange_exprs.items():
+                validate_assignment_bitrange_expr(path, bitrange, expr)
 
-        port_names = {port_name for port_name, _ in self.port_exprs.keys()}
-        for port_name in port_names:
+        for port_name in self.port_exprs.keys():
             path = f"{self.entity_name}@{self.instance_name}.{port_name}"
 
             port = arch_ports[self.entity_name][port_name]
-            assigned_bitranges = {
-                cast(
-                    tuple[int, int], bitrange
-                )  # Validated in validate_arch_bitrange_expr.
-                for assignment_port_name, bitrange in self.port_exprs.keys()
-                if assignment_port_name == port_name
-            }
+            assigned_bitranges = cast(
+                set[BitRange], set(self.port_exprs[port_name].keys())
+            )
             if not bitranges_valid(assigned_bitranges):
                 raise InvalidAssignmentBitrangeError(
                     f"[{path}] Overlapping bitrange assignments in port expressions: "
@@ -156,7 +152,7 @@ def subinstances_with_resolved_port_bitranges(
     undeclared_ports = {
         port_name
         for subinst in subinstances.values()
-        for (port_name, _) in subinst.port_exprs.keys()
+        for port_name in subinst.port_exprs.keys()
         if port_name not in arch_ports.get(subinst.entity_name, {})
     }
     if any(undeclared_ports):
@@ -170,15 +166,15 @@ def subinstances_with_resolved_port_bitranges(
             instance_name=subinst.instance_name,
             entity_name=subinst.entity_name,
             port_exprs={
-                (
-                    port_name,
+                port_name: {
                     (
                         bitrange
                         if bitrange is not None
                         else port_bitrange(arch_ports[subinst.entity_name][port_name])
-                    ),
-                ): expr
-                for (port_name, bitrange), expr in subinst.port_exprs.items()
+                    ): expr
+                    for bitrange, expr in bitrange_exprs.items()
+                }
+                for port_name, bitrange_exprs in subinst.port_exprs.items()
             },
         )
         for subinst_name, subinst in subinstances.items()

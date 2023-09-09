@@ -53,12 +53,12 @@ We need to know how each instance's I/O ports connect to the networks:
 >>> pprint(architecture_subinstances(parse_tree)["Simple_Row"]["SimpleCell_i0"])
 ArchitectureSubinstance(instance_name='SimpleCell_i0',
                         entity_name='Simple_Cell',
-                        port_exprs={('A', None): AliasExpr(var_name='LPM_q_ivl_0',
-                                                           bitrange=None),
-                                    ('B', None): AliasExpr(var_name='A',
-                                                           bitrange=None),
-                                    ('C', None): AliasExpr(var_name='LPM_d0_ivl_32',
-                                                           bitrange=None)})
+                        port_exprs={'A': {None: AliasExpr(var_name='LPM_q_ivl_0',
+                                                          bitrange=None)},
+                                    'B': {None: AliasExpr(var_name='A',
+                                                          bitrange=None)},
+                                    'C': {None: AliasExpr(var_name='LPM_d0_ivl_32',
+                                                          bitrange=None)}})
 
 Finally, we need to know how networks are sourced from each other (using simple logical expressions):
 >>> var_assignments = architecture_var_assignments(parse_tree)["Simple_Row"]
@@ -636,19 +636,19 @@ def expr_from_node(expression_node: ParseTree) -> Expression:
 @called_on_node_type("association_element")
 def association_element_name_slice_expr(
     parse_tree: ParseTree,
-) -> tuple[str, BitRange | None, ParseTree]:
+) -> tuple[str, BitRange | None, Expression]:
     """
     >>> association_element_name_slice_expr(parsed(
     ...     "A (1 downto 0) => a + b / c",
     ...     "association_element",
     ... ))
-    ('A', (0, 1), ParseTree(node_type='expression', ...))
+    ('A', (0, 1), SimpleExpr(...))
 
     >>> association_element_name_slice_expr(parsed(
     ...     "A => a + b / c",
     ...     "association_element",
     ... ))
-    ('A', None, ParseTree(node_type='expression', ...))
+    ('A', None, SimpleExpr(...))
     """
     range_node = parse_tree_get(parse_tree, "formal_part", "explicit_range")
     if range_node is not None:
@@ -659,8 +659,10 @@ def association_element_name_slice_expr(
     return (
         parse_tree_assert_get_text(parse_tree, "formal_part", "identifier", 0),
         range_value,
-        parse_tree_assert_get(
-            parse_tree, "actual_part", "actual_designator", "expression"
+        expr_from_node(
+            parse_tree_assert_get(
+                parse_tree, "actual_part", "actual_designator", "expression"
+            ),
         ),
     )
 
@@ -668,20 +670,19 @@ def association_element_name_slice_expr(
 @called_on_node_type("component_instantiation_statement")
 def component_port_exprs(
     parse_tree: ParseTree,
-) -> dict[tuple[str, BitRange | None], ParseTree]:
+) -> dict[str, dict[BitRange | None, Expression]]:
     assoc_list = parse_tree_assert_get(
         parse_tree, "port_map_aspect", "association_list"
     )
 
     assoc_elements = children_of_type(assoc_list, "association_element")
 
-    return {
-        (var_name, var_slice): expr_from_node(expr)
-        for assoc_element in assoc_elements
-        for var_name, var_slice, expr in (
-            association_element_name_slice_expr(assoc_element),
-        )
-    }
+    port_bitrange_exprs: dict[str, dict[BitRange | None, Expression]] = {}
+    for assoc_element in assoc_elements:
+        port_name, expr_slice, expr = association_element_name_slice_expr(assoc_element)
+        port_bitrange_exprs.setdefault(port_name, {})[expr_slice] = expr
+
+    return port_bitrange_exprs
 
 
 @parse_tree_query
@@ -696,7 +697,7 @@ def architecture_subinstances(
     {'Simple_Cell': {},
      'Simple_Row': {'SimpleCell_i0': ArchitectureSubinstance(instance_name='SimpleCell_i0',
                                                              entity_name='Simple_Cell',
-                                                             port_exprs={('A', None): AliasExpr(...),
+                                                             port_exprs={'A': {None: AliasExpr(...)},
                                                                          ...}),
                     'SimpleCell_i1': ArchitectureSubinstance(...)}}
 

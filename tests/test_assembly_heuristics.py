@@ -7,12 +7,12 @@ from redhdl.assembly.assembly import (
     _unbussable_placement_heuristic_weights,
     _weighted_costs,
 )
+from redhdl.assembly.placement import display_placement
 from redhdl.netlist.netlist_template import (
     example_instance_configs,
     example_network_specs,
     netlist_from_simple_spec,
 )
-from redhdl.voxel.placement import display_placement
 from redhdl.voxel.region import Pos
 
 """
