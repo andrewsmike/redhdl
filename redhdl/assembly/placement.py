@@ -2,7 +2,7 @@
 Placement tools and bussing-naive search methods.
 
 Placements are mappings from InstanceIds to (Position, Direction).
-Bussing-naive placement search is a first-past heuristic search that's useful in the construction of
+Bussing-naive placement search is a first-pass heuristic search that's useful in the construction of
 more advanced and adaptive bussing-aware search.
 
 Placement is SchematicInstance specific and provides schematic-specific helpers.
@@ -44,38 +44,6 @@ InstancePlacement = frozendict[InstanceId, tuple[Pos, Direction]]
 
 
 @first_id_cached
-def placement_valid(
-    netlist: Netlist, placement: InstancePlacement, xz_padding: int = 1
-) -> bool:
-    """
-    Determine if a placement of netlist components is valid.
-
-    This relies on any_overlap. Until extremely intelligent caching is added, this
-    is likely very inefficient for large placements.
-    """
-    instance_regions = [
-        cast(SchematicInstance, netlist.instances[instance_id])
-        .region.y_rotated(xz_directions.index(direction))
-        .shifted(pos)
-        .xz_padded(xz_padding)  # Components need in-between space.
-        for instance_id, (pos, direction) in placement.items()
-    ]
-
-    return not any_overlap(instance_regions)
-
-
-def placement_schematic(netlist: Netlist, placement: InstancePlacement) -> Schematic:
-    instance_schematics = [
-        cast(SchematicInstance, netlist.instances[instance_id])
-        .schematic.y_rotated(xz_directions.index(direction))
-        .shifted(pos)
-        for instance_id, (pos, direction) in placement.items()
-    ]
-
-    return reduce(or_, instance_schematics)
-
-
-@first_id_cached
 def placement_instance_region(
     netlist: Netlist,
     placement: InstancePlacement,
@@ -98,6 +66,24 @@ def placement_region(netlist: Netlist, placement: InstancePlacement) -> Composit
             for instance_id in placement.keys()
         )
     )
+
+
+@first_id_cached
+def placement_valid(
+    netlist: Netlist, placement: InstancePlacement, xz_padding: int = 1
+) -> bool:
+    """
+    Determine if a placement of netlist components is valid.
+
+    This relies on any_overlap. Until extremely intelligent caching is added, this
+    is likely very inefficient for large placements.
+    """
+    padded_instance_regions = [
+        region.xz_padded(xz_padding)
+        for region in placement_region(netlist, placement).subregions
+    ]
+
+    return not any_overlap(padded_instance_regions)
 
 
 @first_id_cached
@@ -198,6 +184,17 @@ def source_dest_pin_pos_pairs(
         )
 
     return results
+
+
+def placement_schematic(netlist: Netlist, placement: InstancePlacement) -> Schematic:
+    instance_schematics = [
+        cast(SchematicInstance, netlist.instances[instance_id])
+        .schematic.y_rotated(xz_directions.index(direction))
+        .shifted(pos)
+        for instance_id, (pos, direction) in placement.items()
+    ]
+
+    return reduce(or_, instance_schematics)
 
 
 def display_placement(netlist: Netlist, placement: InstancePlacement):
