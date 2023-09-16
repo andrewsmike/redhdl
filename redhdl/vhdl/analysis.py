@@ -53,23 +53,26 @@ We need to know how each instance's I/O ports connect to the networks:
 >>> pprint(architecture_subinstances(parse_tree)["Simple_Row"]["SimpleCell_i0"])
 ArchitectureSubinstance(instance_name='SimpleCell_i0',
                         entity_name='Simple_Cell',
-                        port_exprs={'A': {None: AliasExpr(var_name='LPM_q_ivl_0',
-                                                          bitrange=None)},
-                                    'B': {None: AliasExpr(var_name='A',
-                                                          bitrange=None)},
-                                    'C': {None: AliasExpr(var_name='LPM_d0_ivl_32',
-                                                          bitrange=None)}})
+                        port_exprs={'A': {None: ReferenceExpr(var_name='LPM_q_ivl_0',
+                                                              bitrange=None)},
+                                    'B': {None: ReferenceExpr(var_name='A',
+                                                              bitrange=None)},
+                                    'C': {None: ReferenceExpr(var_name='LPM_d0_ivl_32',
+                                                              bitrange=None)}})
 
 Finally, we need to know how networks are sourced from each other (using simple logical expressions):
 >>> var_assignments = architecture_var_assignments(parse_tree)["Simple_Row"]
 >>> pprint(var_assignments)
 {'C': {None: SimpleExpr(...)},
- 'D': {(0, 0): AliasExpr(var_name='tmp_ivl_31', bitrange=None)},
- 'L': {None: ConcatExpr(exprs=[AliasExpr(var_name='tmp_ivl_35', bitrange=None),
-                               AliasExpr(var_name='tmp_ivl_13', bitrange=None),
-                               AliasExpr(var_name='tmp_ivl_9', bitrange=None)])},
+ 'D': {(0, 0): ReferenceExpr(var_name='tmp_ivl_31', bitrange=None)},
+ 'L': {None: ConcatExpr(exprs=[ReferenceExpr(var_name='tmp_ivl_35',
+                                             bitrange=None),
+                               ReferenceExpr(var_name='tmp_ivl_13',
+                                             bitrange=None),
+                               ReferenceExpr(var_name='tmp_ivl_9',
+                                             bitrange=None)])},
  ...
- 'tmp_ivl_9': {None: AliasExpr(var_name='A', bitrange=None)}}
+ 'tmp_ivl_9': {None: ReferenceExpr(var_name='A', bitrange=None)}}
 
 >>> (l_bit_ranges := var_assignments["C"].keys())
 dict_keys([None])
@@ -82,13 +85,13 @@ from redhdl.misc.bitrange import BitRange, bitrange_width
 from redhdl.netlist.netlist import Port, PortType
 from redhdl.vhdl.errors import UnexpectedSyntaxError
 from redhdl.vhdl.models import (
-    AliasExpr,
     Architecture,
     ArchitectureSubinstance,
     ConcatExpr,
     CondExpr,
     ConstExpr,
     Expression,
+    ReferenceExpr,
     SimpleExpr,
     UnconditionalExpr,
     assignments_with_resolved_bitranges,
@@ -462,7 +465,7 @@ _alias_identifier_node_paths = [
 
 
 @called_on_node_type("term")
-def alias_from_term_node(alias_expr_node: ParseTree) -> AliasExpr | None:
+def alias_from_term_node(alias_expr_node: ParseTree) -> ReferenceExpr | None:
     """
     Direct alias:
     expression -> relation -> shift_expression -> simple_expression
@@ -485,17 +488,17 @@ def alias_from_term_node(alias_expr_node: ParseTree) -> AliasExpr | None:
             -2x-> simple_expression -> term -> factor -> primary -> literal
             -> numeric_literal -> abstract_literal -> <TOKEN>
 
-    Aliases get parsed into AliasExpr objects:
+    Aliases get parsed into ReferenceExpr objects:
     >>> alias_from_term_node(parsed("tmp_ivl_21", "term"))
-    AliasExpr(var_name='tmp_ivl_21', bitrange=None)
+    ReferenceExpr(var_name='tmp_ivl_21', bitrange=None)
 
     Bit indices are handled:
     >>> alias_from_term_node(parsed("tmp_ivl_21(2)", "term"))
-    AliasExpr(var_name='tmp_ivl_21', bitrange=(2, 2))
+    ReferenceExpr(var_name='tmp_ivl_21', bitrange=(2, 2))
 
     Bit ranges are handled:
     >>> alias_from_term_node(parsed("tmp_ivl_21(4 downto 2)", "term"))
-    AliasExpr(var_name='tmp_ivl_21', bitrange=(2, 4))
+    ReferenceExpr(var_name='tmp_ivl_21', bitrange=(2, 4))
     """
     alias_nodes = [
         child_node
@@ -522,9 +525,9 @@ def alias_from_term_node(alias_expr_node: ParseTree) -> AliasExpr | None:
         alias_expr_node, *_alias_base_path, "name", "name_part"
     )
     if indexing_base_node is None:
-        return AliasExpr(alias_name, None)
+        return ReferenceExpr(alias_name, None)
     else:
-        return AliasExpr(alias_name, bitrange_from_name_part(indexing_base_node))
+        return ReferenceExpr(alias_name, bitrange_from_name_part(indexing_base_node))
 
 
 @called_on_node_type("term")
@@ -596,9 +599,9 @@ def expr_from_node(expression_node: ParseTree) -> Expression:
       : ( PLUS | MINUS )? term ( : adding_operator term )*
       ;
     >>> pprint(expr_from_node(parsed("A & B & C", "expression")))
-    ConcatExpr(exprs=[AliasExpr(var_name='A', bitrange=None),
-                      AliasExpr(var_name='B', bitrange=None),
-                      AliasExpr(var_name='C', bitrange=None)])
+    ConcatExpr(exprs=[ReferenceExpr(var_name='A', bitrange=None),
+                      ReferenceExpr(var_name='B', bitrange=None),
+                      ReferenceExpr(var_name='C', bitrange=None)])
     """
     simple_expr_node = parse_tree_get(
         expression_node,
@@ -697,7 +700,7 @@ def architecture_subinstances(
     {'Simple_Cell': {},
      'Simple_Row': {'SimpleCell_i0': ArchitectureSubinstance(instance_name='SimpleCell_i0',
                                                              entity_name='Simple_Cell',
-                                                             port_exprs={'A': {None: AliasExpr(...)},
+                                                             port_exprs={'A': {None: ReferenceExpr(...)},
                                                                          ...}),
                     'SimpleCell_i1': ArchitectureSubinstance(...)}}
 
@@ -912,13 +915,13 @@ def waveform_expr(waveform_node: ParseTree) -> Expression:
 def cond_waveforms_expr(cond_waveforms_node: ParseTree) -> Expression:
     """
     >>> pprint(cond_waveforms_expr(parsed("1 WHEN A ELSE 2 WHEN B", "conditional_waveforms")))
-    CondExpr(conditions=[(AliasExpr(...),
+    CondExpr(conditions=[(ReferenceExpr(...),
                           ConstExpr(...)),
-                         (AliasExpr(...),
+                         (ReferenceExpr(...),
                           ConstExpr(...))])
 
     >>> pprint(cond_waveforms_expr(parsed("1 WHEN A ELSE 2", "conditional_waveforms")))
-    CondExpr(conditions=[(AliasExpr(...),
+    CondExpr(conditions=[(ReferenceExpr(...),
                           ConstExpr(value=1)),
                          (None, ConstExpr(value=2))])
 

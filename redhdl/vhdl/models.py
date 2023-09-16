@@ -30,21 +30,21 @@ class ConstExpr:
 
 
 @dataclass
-class AliasExpr:
+class ReferenceExpr:
     var_name: str
     bitrange: BitRange | None
 
     def __str__(self):
         if self.bitrange is not None:
             start, end = self.bitrange
-            return f"AliasExpr({self.var_name} ({start} downto {end}))"
+            return f"ReferenceExpr({self.var_name} ({start} downto {end}))"
         else:
-            return f"AliasExpr({self.var_name})"
+            return f"ReferenceExpr({self.var_name})"
 
 
 @dataclass
 class ConcatExpr:
-    exprs: list[AliasExpr | ConstExpr]
+    exprs: list[ReferenceExpr | ConstExpr]
 
     def __str__(self):
         return f"SimpleExpr(expr='{str_from_parse_tree(self.expr)}')"
@@ -58,7 +58,7 @@ class SimpleExpr:
         return f"SimpleExpr(expr='{str_from_parse_tree(self.expr)}')"
 
 
-UnconditionalExpr = SimpleExpr | ConstExpr | AliasExpr | ConcatExpr
+UnconditionalExpr = SimpleExpr | ConstExpr | ReferenceExpr | ConcatExpr
 
 
 @dataclass
