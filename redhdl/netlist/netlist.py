@@ -422,7 +422,7 @@ class Netlist:
     def source_dest_pin_id_seq_pairs(
         self,
     ) -> Iterable[tuple[PinIdSequence, PinIdSequence]]:
-        """The PinIdSequence -> PinIdSequence pairs of a network."""
+        """All non-I/O PinIdSequence -> PinIdSequence pairs."""
 
         for network_id, network in self.networks.items():
             instance_id, port_name = network.input_pin_id_seq.port_id
