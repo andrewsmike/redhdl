@@ -89,7 +89,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
 from itertools import groupby
-from typing import Any, Literal, Optional
+from typing import Any, Iterable, Literal, Optional
 
 from frozendict import frozendict
 
@@ -418,6 +418,23 @@ class Netlist:
                 if (subnetwork := network.subnetwork(instance_ids)) is not None
             },
         )
+
+    def source_dest_pin_id_seq_pairs(
+        self,
+    ) -> Iterable[tuple[PinIdSequence, PinIdSequence]]:
+        """The PinIdSequence -> PinIdSequence pairs of a network."""
+
+        for network_id, network in self.networks.items():
+            instance_id, port_name = network.input_pin_id_seq.port_id
+            if instance_id == "input":
+                continue
+
+            for dest_pin_id_seq in network.output_pin_id_seqs:
+                instance_id, port_name = dest_pin_id_seq.port_id
+                if instance_id == "output":
+                    continue
+
+                yield (network.input_pin_id_seq, dest_pin_id_seq)
 
 
 @dataclass

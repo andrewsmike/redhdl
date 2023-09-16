@@ -12,7 +12,7 @@ from functools import reduce
 from operator import or_
 from pprint import pprint
 from random import choice, random, sample
-from typing import Iterable, cast
+from typing import cast
 
 from frozendict import frozendict
 from tqdm import tqdm
@@ -117,24 +117,6 @@ def placement_pin_seq_points(
     return wire_points.y_rotated(xz_directions.index(instance_dir)) + instance_pos
 
 
-def source_dest_pin_id_seq_pairs(
-    netlist: Netlist,
-) -> Iterable[tuple[PinIdSequence, PinIdSequence]]:
-    """The PinIdSequence -> PinIdSequence pairs of a network."""
-
-    for network_id, network in netlist.networks.items():
-        instance_id, port_name = network.input_pin_id_seq.port_id
-        if instance_id == "input":
-            continue
-
-        for dest_pin_id_seq in network.output_pin_id_seqs:
-            instance_id, port_name = dest_pin_id_seq.port_id
-            if instance_id == "output":
-                continue
-
-            yield (network.input_pin_id_seq, dest_pin_id_seq)
-
-
 @dataclass(frozen=True, order=True)
 class PinPosPair:
     source_pin_id: PinId
@@ -156,7 +138,7 @@ def source_dest_pin_pos_pairs(
     """The pin@pos -> pin@pos pairs of a network + placement."""
     results: list[PinPosPair] = []
 
-    for source_pin_id_seq, dest_pin_id_seq in source_dest_pin_id_seq_pairs(netlist):
+    for source_pin_id_seq, dest_pin_id_seq in netlist.source_dest_pin_id_seq_pairs():
 
         source_pin_points = placement_pin_seq_points(
             netlist, source_pin_id_seq, placement

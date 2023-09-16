@@ -7,7 +7,6 @@ from redhdl.assembly.placement import (
     placement_pin_seq_points,
     placement_region,
     placement_schematic,
-    source_dest_pin_id_seq_pairs,
     source_dest_pin_pos_pairs,
 )
 from redhdl.bussing.redstone_bussing import (
@@ -159,7 +158,7 @@ def misaligned_bus_pct(netlist: Netlist, placement: InstancePlacement) -> float:
     misaligned_bus_count = 0.0
     bus_count = 0
 
-    for source_pin_id_seq, dest_pin_id_seq in source_dest_pin_id_seq_pairs(netlist):
+    for source_pin_id_seq, dest_pin_id_seq in netlist.source_dest_pin_id_seq_pairs():
         bus_count += 1  # Denominator.
 
         source_pin_points = placement_pin_seq_points(
@@ -191,7 +190,7 @@ def stride_aligned_bus_pct(netlist: Netlist, placement: InstancePlacement) -> fl
     stride_aligned_bus_count = 0
     bus_count = 0
 
-    for source_pin_id_seq, dest_pin_id_seq in source_dest_pin_id_seq_pairs(netlist):
+    for source_pin_id_seq, dest_pin_id_seq in netlist.source_dest_pin_id_seq_pairs():
         bus_count += 1  # Denominator.
 
         source_pin_points = placement_pin_seq_points(
@@ -222,7 +221,7 @@ def crossed_bus_pct(netlist: Netlist, placement: InstancePlacement) -> float:
     """
     port_pair_region = {}
 
-    for source_pin_id_seq, dest_pin_id_seq in source_dest_pin_id_seq_pairs(netlist):
+    for source_pin_id_seq, dest_pin_id_seq in netlist.source_dest_pin_id_seq_pairs():
         source_pin_points = placement_pin_seq_points(
             netlist, source_pin_id_seq, placement
         )
