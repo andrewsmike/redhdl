@@ -552,6 +552,11 @@ class PointRegion(Region):
         return point in self.points
 
     def __and__(self, other: Region) -> Any:
+
+        # Fast AABB check.
+        if not (self.min_pos <= other.max_pos and self.max_pos >= other.min_pos):
+            return PointRegion(frozenset())
+
         if isinstance(other, PointRegion):
             return PointRegion(self.points & other.points)
         elif isinstance(other, (RectangularPrism, CompositeRegion)):
@@ -664,7 +669,12 @@ class RectangularPrism(Region):
         return self.min_pos <= point <= self.max_pos
 
     def __and__(self, other: Region) -> Any:
+        # Fast AABB check.
+        if not (self.min_pos <= other.max_pos and self.max_pos >= other.min_pos):
+            return PointRegion(frozenset())
+
         if isinstance(other, RectangularPrism):
+            # Guaranteed some overlap, given the AABB check above.
             return RectangularPrism(
                 min_pos=Pos.elem_max(self.min_pos, other.min_pos),
                 max_pos=Pos.elem_min(self.max_pos, other.max_pos),
@@ -772,17 +782,6 @@ class CompositeRegion(Region):
                 subregions=(*self.subregions, *other.subregions),
             )
 
-        if isinstance(other, PointRegion):
-            for index, region in enumerate(self.subregions):
-                if isinstance(region, PointRegion):
-                    return CompositeRegion(
-                        subregions=(
-                            self.subregions[:index]
-                            + (region | other,)
-                            + self.subregions[index + 1 :]
-                        )
-                    )
-
         return CompositeRegion(
             subregions=(*self.subregions, other),
         )
@@ -791,6 +790,10 @@ class CompositeRegion(Region):
         return self.__or__(other)
 
     def __and__(self, other: Region) -> Any:
+        # Fast AABB check.
+        if not (self.min_pos <= other.max_pos and self.max_pos >= other.min_pos):
+            return PointRegion(frozenset())
+
         if isinstance(other, CompositeRegion):
             # When combining composite regions, flatten.
             regions = [
@@ -832,8 +835,6 @@ class CompositeRegion(Region):
 
 def any_overlap(regions: list[Region]) -> bool:
     """
-    TODO: Use AABB bounds to speed this up.
-
     >>> any_overlap([
     ...     CompositeRegion((
     ...         RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
@@ -855,6 +856,8 @@ def any_overlap(regions: list[Region]) -> bool:
     True
     """
     return any(
+        # All Region.intersects() methods use a fail-fast AABB min/max check.
+        # Still O(n^2), but reasonably fast if most pairs aren't in the same AABB region.
         left.intersects(right)
         for left_index, left in enumerate(regions)
         for right in regions[left_index + 1 :]

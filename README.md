@@ -94,8 +94,9 @@ Assembly:
 
 
 WHAT'S MISSING:
-- region.py: Diagonal polyhedra are needed to support diag circuits.
-- instance_template: Support for diagonal circuits.
+- schematic_instance: Support for diagonal circuits.
+- region.py: Supporting polyhedral regions for diagonal circuits would allow us to switch
+    from PointRegions to a more efficient representation.
 
 - redstone_bussing.py:
     - Current representation is insufficiently efficient
