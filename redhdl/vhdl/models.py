@@ -43,19 +43,20 @@ class ReferenceExpr:
 
 
 @dataclass
-class ConcatExpr:
-    exprs: list[ReferenceExpr | ConstExpr]
+class SimpleExpr:
+    expr: ParseTree
 
     def __str__(self):
         return f"SimpleExpr(expr='{str_from_parse_tree(self.expr)}')"
 
 
 @dataclass
-class SimpleExpr:
-    expr: ParseTree
+class ConcatExpr:
+    exprs: list[ReferenceExpr | ConstExpr | SimpleExpr]
 
     def __str__(self):
-        return f"SimpleExpr(expr='{str_from_parse_tree(self.expr)}')"
+        exprs_str = ", ".join(str(expr) for expr in self.exprs)
+        return f"ConcatExpr(exprs=['{exprs_str}'])"
 
 
 UnconditionalExpr = SimpleExpr | ConstExpr | ReferenceExpr | ConcatExpr
