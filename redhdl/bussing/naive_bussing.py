@@ -27,6 +27,7 @@ PartialPinBuses = dict[PinId, RedstoneBussing | None]
 def dest_pin_buses(
     netlist: Netlist,
     placement: InstancePlacement,
+    max_bussing_steps: int = 50,
 ) -> PinBuses:
     instances_region = placement_region(netlist, placement).xz_padded(1)
     instance_region_points = instances_region.region_points()
@@ -42,12 +43,12 @@ def dest_pin_buses(
                 end_xz_dir=pin_pos_pair.dest_pin_facing,
                 instance_points=instance_region_points,
                 other_buses=other_buses,
-                max_steps=2_048,
+                max_steps=max_bussing_steps,
             )
         except BaseException:
             from time import time
 
-            from redhdl.schematic import save_schem
+            from redhdl.voxel.schematic import save_schem
 
             save_schem(
                 bussed_placement_schematic(netlist, placement, dest_pin_buses),

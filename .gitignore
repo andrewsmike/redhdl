@@ -5,3 +5,4 @@ __pycache__
 *.prof
 output_schems
 checkpoints
+build/

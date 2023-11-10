@@ -119,7 +119,7 @@ Y  [(0, 3)]
 ...     # display_regions(schem.pos_blocks.mask())
 """
 from dataclasses import dataclass, field, replace
-from functools import reduce
+from functools import cached_property, reduce
 from logging import getLogger
 from random import choice
 from typing import Any, Literal, NamedTuple, Optional, cast
@@ -241,7 +241,7 @@ class RedstoneBussing:
     spacer_blocks: frozenset[Pos] = field(default_factory=frozenset)
     airspace_blocks: frozenset[Pos] = field(default_factory=frozenset)
 
-    @property
+    @cached_property
     def foundation_blocks(self) -> set[Pos]:
         return {
             wire_pos + direction_unit_pos["down"]
@@ -256,34 +256,34 @@ class RedstoneBussing:
             other_bus_airspace_blocks | self.airspace_blocks
         )
 
-    @property
+    @cached_property
     def element_blocks(self) -> set[Pos]:
         return set(self.element_sig_strengths)
 
-    @property
+    @cached_property
     def non_element_blocks(self) -> set[Pos]:
         return (self.foundation_blocks | self.spacer_blocks) - self.element_blocks
 
-    @property
+    @cached_property
     def repeater_blocks(self) -> set[Pos]:
         return set(self.repeater_directions.keys())
 
-    @property
+    @cached_property
     def wire_blocks(self) -> set[Pos]:
         return self.element_blocks - self.repeater_blocks
 
-    @property
+    @cached_property
     def element_foundation_blocks(self) -> set[Pos]:
         return self.element_blocks | self.foundation_blocks
 
-    @property
+    @cached_property
     def soft_power_sensitive_blocks(self) -> frozenset[Pos]:
         return frozenset(
             repeater_block - direction_unit_pos[direction]
             for repeater_block, direction in self.repeater_directions.items()
         )
 
-    @property
+    @cached_property
     def hard_power_sensitive_blocks(self) -> frozenset[Pos]:
         return (
             self.soft_power_sensitive_blocks
@@ -295,14 +295,14 @@ class RedstoneBussing:
             }
         )
 
-    @property
+    @cached_property
     def hard_powered_blocks(self) -> set[Pos]:
         return {
             repeater_block + direction_unit_pos[direction]
             for repeater_block, direction in self.repeater_directions.items()
         }
 
-    @property
+    @cached_property
     def soft_powered_blocks(self) -> set[Pos]:
         return (
             self.hard_powered_blocks
@@ -340,7 +340,7 @@ class RedstoneBussing:
         else:
             return directions_with_wire
 
-    @property
+    @cached_property
     def all_blocks(self) -> set[Pos]:
         return (
             set(self.element_sig_strengths.keys())
@@ -349,11 +349,11 @@ class RedstoneBussing:
             | self.foundation_blocks
         )
 
-    @property
+    @cached_property
     def min_pos(self) -> Pos:
         return reduce(Pos.elem_min, self.all_blocks)
 
-    @property
+    @cached_property
     def max_pos(self) -> Pos:
         return reduce(Pos.elem_max, self.all_blocks)
 
@@ -1083,7 +1083,7 @@ class RedstonePathFindingProblem(
 
     def min_cost(self, state: PartialBus | None) -> float:
         if state is None:
-            return 10000
+            return 100_000
 
         distance_vector = self.end_pos - state.current_position
 

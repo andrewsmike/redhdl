@@ -34,7 +34,7 @@ We need to know the Netlist's I/O spec:
 We need to know what (sub)instances are part of the Netlist, and their types:
 >>> pprint(architecture_subinstances(parse_tree)["Simple_Row"])
 {'SimpleCell_i0': ArchitectureSubinstance(instance_name='SimpleCell_i0',
-                                          entity_name='Simple_Cell',
+                                          instance_type='Simple_Cell',
                                           ...}),
  'SimpleCell_i1': ArchitectureSubinstance(...)}
 
@@ -52,7 +52,7 @@ We need to know what networks are used in the Netlist, and their bitwidths:
 We need to know how each instance's I/O ports connect to the networks:
 >>> pprint(architecture_subinstances(parse_tree)["Simple_Row"]["SimpleCell_i0"])
 ArchitectureSubinstance(instance_name='SimpleCell_i0',
-                        entity_name='Simple_Cell',
+                        instance_type='Simple_Cell',
                         port_exprs={'A': {None: ReferenceExpr(var_name='LPM_q_ivl_0',
                                                               bitrange=None)},
                                     'B': {None: ReferenceExpr(var_name='A',
@@ -94,6 +94,10 @@ from redhdl.vhdl.models import (
     ReferenceExpr,
     SimpleExpr,
     UnconditionalExpr,
+    VHDLArchitectureName,
+    VHDLInstanceName,
+    VHDLPortName,
+    VHDLVariableName,
     assignments_with_resolved_bitranges,
     subinstances_with_resolved_port_bitranges,
 )
@@ -107,6 +111,7 @@ from redhdl.vhdl.parse_tree import (
     parse_tree_from_file,
     parse_tree_get,
     parse_tree_query,
+    str_from_parse_tree,
 )
 
 
@@ -260,7 +265,7 @@ def port_clause_ports(parse_tree: ParseTree) -> dict[str, Port]:
 def architecture_ports(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[str, dict[str, Port]]:
+) -> dict[VHDLArchitectureName, dict[VHDLPortName, Port]]:
     """
     The (name -> Port) mappings for every entity in the parse tree.
 
@@ -302,22 +307,19 @@ def architecture_ports(
 def architecture_ports_entity_declaration(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[str, dict[str, Port]]:
-    entity_name = parse_tree_assert_get_text(parse_tree, "identifier", 0)
+) -> dict[VHDLArchitectureName, dict[VHDLPortName, Port]]:
+    instance_type = parse_tree_assert_get_text(parse_tree, "identifier", 0)
     port_clause = parse_tree_assert_get(parse_tree, "entity_header", "port_clause")
     ports = port_clause_ports(port_clause)
 
-    return {entity_name: ports}
-
-
-ArchitectureName = str
+    return {VHDLArchitectureName(instance_type): ports}
 
 
 @parse_tree_query
 def tree_architecture_nodes(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[ArchitectureName, ParseTree]:
+) -> dict[VHDLArchitectureName, ParseTree]:
     """
     Architecture nodes, by entity name.
 
@@ -334,9 +336,9 @@ def tree_architecture_nodes(
                              ...)}
     """
     return {
-        entity_name: node
+        instance_type: node
         for child_nodes in children_values
-        for entity_name, node in child_nodes.items()
+        for instance_type, node in child_nodes.items()
     }
 
 
@@ -344,10 +346,10 @@ def tree_architecture_nodes(
 def tree_architecture_nodes_architecture_body(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[ArchitectureName, ParseTree]:
-    entity_name = parse_tree_assert_get_text(parse_tree, 3, 0)
+) -> dict[VHDLArchitectureName, ParseTree]:
+    instance_type = parse_tree_assert_get_text(parse_tree, 3, 0)
 
-    return {entity_name: parse_tree}
+    return {VHDLArchitectureName(instance_type): parse_tree}
 
 
 def const_from_quoted_str(value: str) -> int:
@@ -519,7 +521,7 @@ def alias_from_term_node(alias_expr_node: ParseTree) -> ReferenceExpr | None:
     elif len(alias_nodes) == 0:
         return None
 
-    alias_name = parse_tree_assert_get_text(alias_nodes[0], 0)
+    alias_name = VHDLVariableName(parse_tree_assert_get_text(alias_nodes[0], 0))
 
     indexing_base_node = parse_tree_get(
         alias_expr_node, *_alias_base_path, "name", "name_part"
@@ -692,20 +694,22 @@ def component_port_exprs(
 def architecture_subinstances(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[ArchitectureName, dict[str, ArchitectureSubinstance]]:
+) -> dict[VHDLArchitectureName, dict[VHDLInstanceName, ArchitectureSubinstance]]:
     """
     >>> parse_tree = parse_tree_from_file("hdl_examples/simple/Simple.vhdl")
 
     >>> pprint(architecture_subinstances(parse_tree))
     {'Simple_Cell': {},
      'Simple_Row': {'SimpleCell_i0': ArchitectureSubinstance(instance_name='SimpleCell_i0',
-                                                             entity_name='Simple_Cell',
+                                                             instance_type='Simple_Cell',
                                                              port_exprs={'A': {None: ReferenceExpr(...)},
                                                                          ...}),
                     'SimpleCell_i1': ArchitectureSubinstance(...)}}
 
     """
-    results: dict[ArchitectureName, dict[str, ArchitectureSubinstance]] = {}
+    results: dict[
+        VHDLArchitectureName, dict[VHDLInstanceName, ArchitectureSubinstance]
+    ] = {}
     for child_vars in children_values:
         for arch_name, arch_subinstances in child_vars.items():
             results.setdefault(arch_name, {}).update(arch_subinstances)
@@ -713,11 +717,14 @@ def architecture_subinstances(
     return results
 
 
+_UNKNOWN_ARCH = VHDLArchitectureName("___UNKNOWN_ARCH_!@#$%^&*")
+
+
 @architecture_subinstances.register("component_instantiation_statement")
 def architecture_subinstances_instantiation_statement(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[ArchitectureName, dict[str, ArchitectureSubinstance]]:
+) -> dict[VHDLArchitectureName, dict[VHDLInstanceName, ArchitectureSubinstance]]:
     instance_name = parse_tree_assert_get_text(
         parse_tree, "label_colon", "identifier", 0
     )
@@ -726,10 +733,10 @@ def architecture_subinstances_instantiation_statement(
     )
 
     return {
-        "UNKNOWN_ARCH": {
-            instance_name: ArchitectureSubinstance(
-                instance_name=instance_name,
-                entity_name=entity_type_name,
+        _UNKNOWN_ARCH: {
+            VHDLInstanceName(instance_name): ArchitectureSubinstance(
+                instance_name=VHDLInstanceName(instance_name),
+                instance_type=VHDLArchitectureName(entity_type_name),
                 port_exprs=component_port_exprs(parse_tree),
             ),
         },
@@ -740,17 +747,19 @@ def architecture_subinstances_instantiation_statement(
 def architecture_subinstances_architecture_body(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[ArchitectureName, dict[str, ArchitectureSubinstance]]:
+) -> dict[VHDLArchitectureName, dict[VHDLInstanceName, ArchitectureSubinstance]]:
     arch_name = parse_tree_assert_get_text(parse_tree, 3, 0)  # Identifier
 
-    results: dict[ArchitectureName, dict[str, ArchitectureSubinstance]] = {}
+    results: dict[
+        VHDLArchitectureName, dict[VHDLInstanceName, ArchitectureSubinstance]
+    ] = {}
     for child_value in children_values:
         for child_arch_name, arch_subinstances in child_value.items():
             results.setdefault(child_arch_name, {}).update(arch_subinstances)
 
-    results[arch_name] = results.get("UNKNOWN_ARCH", {})
-    if "UNKNOWN_ARCH" in results:
-        del results["UNKNOWN_ARCH"]
+    results[VHDLArchitectureName(arch_name)] = results.get(_UNKNOWN_ARCH, {})
+    if _UNKNOWN_ARCH in results:
+        del results[_UNKNOWN_ARCH]
 
     return results
 
@@ -771,7 +780,7 @@ def identifier_list_strs(identifier_list_node: ParseTree) -> list[str]:
 def architecture_local_var_bitrange(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[ArchitectureName, dict[str, BitRange]]:
+) -> dict[VHDLArchitectureName, dict[VHDLVariableName, BitRange]]:
     """
     >>> parse_tree = parse_tree_from_file("hdl_examples/simple/Simple.vhdl")
     >>> pprint(architecture_local_var_bitrange(parse_tree))
@@ -789,7 +798,7 @@ def architecture_local_var_bitrange(
                     ...,
                     'tmp_ivl_9': (0, 0)}}
     """
-    results: dict[ArchitectureName, dict[str, BitRange]] = {}
+    results: dict[VHDLArchitectureName, dict[VHDLVariableName, BitRange]] = {}
     for child_vars in children_values:
         for arch_name, arch_vars in child_vars.items():
             results.setdefault(arch_name, {}).update(arch_vars)
@@ -801,7 +810,7 @@ def architecture_local_var_bitrange(
 def architecture_local_var_bitrange_signal_declaration(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[ArchitectureName, dict[str, BitRange]]:
+) -> dict[VHDLArchitectureName, dict[VHDLVariableName, BitRange]]:
     """
     signal_declaration
       : SIGNAL identifier_list COLON
@@ -826,7 +835,10 @@ def architecture_local_var_bitrange_signal_declaration(
     )
 
     return {
-        "UNKNOWN_ARCH": {local_var_name: bitrange for local_var_name in local_var_names}
+        _UNKNOWN_ARCH: {
+            VHDLVariableName(local_var_name): bitrange
+            for local_var_name in local_var_names
+        }
     }
 
 
@@ -834,17 +846,17 @@ def architecture_local_var_bitrange_signal_declaration(
 def architecture_local_var_bitrange_architecture_body(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[ArchitectureName, dict[str, BitRange]]:
+) -> dict[VHDLArchitectureName, dict[VHDLVariableName, BitRange]]:
     arch_name = parse_tree_assert_get_text(parse_tree, 3, 0)  # Identifier
 
-    results: dict[ArchitectureName, dict[str, BitRange]] = {}
+    results: dict[VHDLArchitectureName, dict[VHDLVariableName, BitRange]] = {}
     for child_value in children_values:
         for child_arch_name, var_bitwidths in child_value.items():
             results.setdefault(child_arch_name, {}).update(var_bitwidths)
 
-    results[arch_name] = results.get("UNKNOWN_ARCH", {})
-    if "UNKNOWN_ARCH" in results:
-        del results["UNKNOWN_ARCH"]
+    results[VHDLArchitectureName(arch_name)] = results.get(_UNKNOWN_ARCH, {})
+    if _UNKNOWN_ARCH in results:
+        del results[_UNKNOWN_ARCH]
 
     return results
 
@@ -867,7 +879,9 @@ def name_node_str(name_node: ParseTree) -> str:
 def architecture_var_assignments(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[ArchitectureName, dict[str, dict[BitRange | None, Expression]]]:
+) -> dict[
+    VHDLArchitectureName, dict[VHDLVariableName, dict[BitRange | None, Expression]]
+]:
     """
     >>> parse_tree = parse_tree_from_file("hdl_examples/simple/Simple.vhdl")
 
@@ -884,7 +898,9 @@ def architecture_var_assignments(
     >>> print(str_from_parse_tree(assignment_expr.expr))
     A xor B
     """
-    results: dict[ArchitectureName, dict[str, dict[BitRange | None, Expression]]] = {}
+    results: dict[
+        VHDLArchitectureName, dict[VHDLVariableName, dict[BitRange | None, Expression]]
+    ] = {}
     for child_vars in children_values:
         for arch_name, var_bitrange_exprs in child_vars.items():
             for var_name, bitrange_exprs in var_bitrange_exprs.items():
@@ -959,7 +975,9 @@ def cond_waveforms_expr(cond_waveforms_node: ParseTree) -> Expression:
 def architecture_var_assignments_cond_signal_assignment(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[ArchitectureName, dict[str, dict[BitRange | None, Expression]]]:
+) -> dict[
+    VHDLArchitectureName, dict[VHDLVariableName, dict[BitRange | None, Expression]]
+]:
     """
     architecture_statement
     concurrent_signal_assignment_statement
@@ -996,12 +1014,17 @@ def architecture_var_assignments_cond_signal_assignment(
     else:
         bitrange = None
 
-    expr = cond_waveforms_expr(
-        parse_tree_assert_get(parse_tree, "conditional_waveforms")
-    )
+    # Currently, the SV => VHDL process is injecting random zero-this-wire statements.
+    # Not sure of the original cause, so ignoring these blanket assignments.
+    # This will cause issues if normal user inputs trigger this condition down the line.
+    cond_waveform = parse_tree_assert_get(parse_tree, "conditional_waveforms")
+    if str_from_parse_tree(cond_waveform) == "( others => 'Z' )":
+        return {}
+
+    expr = cond_waveforms_expr(cond_waveform)
 
     return {
-        "UNKNOWN_ARCH": {local_var_name: {bitrange: expr}},
+        _UNKNOWN_ARCH: {VHDLVariableName(local_var_name): {bitrange: expr}},
     }
 
 
@@ -1009,10 +1032,14 @@ def architecture_var_assignments_cond_signal_assignment(
 def architecture_var_assignments_architecture_body(
     parse_tree: ParseTree,
     children_values: list[Any],
-) -> dict[ArchitectureName, dict[str, dict[BitRange | None, Expression]]]:
+) -> dict[
+    VHDLArchitectureName, dict[VHDLVariableName, dict[BitRange | None, Expression]]
+]:
     arch_name = parse_tree_assert_get_text(parse_tree, 3, 0)  # Identifier
 
-    results: dict[ArchitectureName, dict[str, dict[BitRange | None, Expression]]] = {}
+    results: dict[
+        VHDLArchitectureName, dict[VHDLVariableName, dict[BitRange | None, Expression]]
+    ] = {}
     for child_vars in children_values:
         for child_arch_name, var_bitrange_exprs in child_vars.items():
             for var_name, bitrange_exprs in var_bitrange_exprs.items():
@@ -1020,14 +1047,14 @@ def architecture_var_assignments_architecture_body(
                     bitrange_exprs
                 )
 
-    results[arch_name] = results.get("UNKNOWN_ARCH", {})
-    if "UNKNOWN_ARCH" in results:
-        del results["UNKNOWN_ARCH"]
+    results[VHDLArchitectureName(arch_name)] = results.get(_UNKNOWN_ARCH, {})
+    if _UNKNOWN_ARCH in results:
+        del results[_UNKNOWN_ARCH]
 
     return results
 
 
-def arches_from_vhdl_path(vhdl_path: str) -> dict[str, Architecture]:
+def arches_from_vhdl_path(vhdl_path: str) -> dict[VHDLArchitectureName, Architecture]:
     """
     >>> arches = arches_from_vhdl_path("hdl_examples/simple/Simple.vhdl")
     >>> pprint(arches)
@@ -1047,12 +1074,15 @@ def arches_from_vhdl_path(vhdl_path: str) -> dict[str, Architecture]:
     arch_var_bitranges = architecture_local_var_bitrange(parse_tree)
     arch_assignments = architecture_var_assignments(parse_tree)
 
-    arch_names = (
-        arch_subinstances.keys()
-        | arch_ports.keys()
-        | arch_var_bitranges.keys()
-        | arch_assignments.keys()
-    )
+    arch_names = {
+        VHDLArchitectureName(arch_name)
+        for arch_name in (
+            arch_subinstances.keys()
+            | arch_ports.keys()
+            | arch_var_bitranges.keys()
+            | arch_assignments.keys()
+        )
+    }
 
     # Note: it'd be nicer to break out the bitrange resolving pass, so it can be
     # used in different contexts / with more port expressions available.

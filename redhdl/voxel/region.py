@@ -247,11 +247,17 @@ class Pos(NamedTuple):
 
     @classmethod
     def elem_min(cls, *points: "Pos") -> "Pos":
+        if not points:
+            raise ValueError("Cannot find min element of empty set.")
+
         xs, ys, zs = zip(*points)
         return cls(min(xs), min(ys), min(zs))
 
     @classmethod
     def elem_max(cls, *points: "Pos") -> "Pos":
+        if not points:
+            raise ValueError("Cannot find min element of empty set.")
+
         xs, ys, zs = zip(*points)
         return cls(max(xs), max(ys), max(zs))
 
@@ -509,10 +515,16 @@ class PointRegion(Region):
 
     @cached_property
     def min_pos(self) -> Pos:  # type: ignore
+        if not self.points:
+            return zero_pos
+
         return Pos.elem_min(*self.points)
 
     @cached_property
     def max_pos(self) -> Pos:  # type: ignore
+        if not self.points:
+            return zero_pos
+
         return Pos.elem_max(*self.points)
 
     def shifted(self, offset: Pos) -> Region:

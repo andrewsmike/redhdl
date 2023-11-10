@@ -168,6 +168,10 @@ def source_dest_pin_pos_pairs(
     return results
 
 
+class OverlappingPlacementError(BaseException):
+    pass
+
+
 def placement_schematic(netlist: Netlist, placement: InstancePlacement) -> Schematic:
     instance_schematics = [
         cast(SchematicInstance, netlist.instances[instance_id])
@@ -175,6 +179,11 @@ def placement_schematic(netlist: Netlist, placement: InstancePlacement) -> Schem
         .shifted(pos)
         for instance_id, (pos, direction) in placement.items()
     ]
+
+    if any_overlap([schematic.mask() for schematic in instance_schematics]):
+        raise OverlappingPlacementError(
+            "Cannot generate schematic; placement has overlapping instances."
+        )
 
     return reduce(or_, instance_schematics)
 
@@ -375,7 +384,7 @@ def mutated_placement(placement: InstancePlacement) -> InstancePlacement:
 
 
 @dataclass
-class PlacementProblem(LocalSearchProblem[InstancePlacement]):
+class CompactPlacementProblem(LocalSearchProblem[InstancePlacement]):
     netlist: Netlist
 
     def random_solution(self) -> InstancePlacement:
@@ -395,7 +404,7 @@ def sim_annealing_searched_compact_placement(
     netlist: Netlist,
     max_iterations: int = 60_000,
 ) -> InstancePlacement:
-    placement_problem = PlacementProblem(netlist)
+    placement_problem = CompactPlacementProblem(netlist)
     return sim_annealing_searched_solution(
         placement_problem, total_rounds=max_iterations
     )

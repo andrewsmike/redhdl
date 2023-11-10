@@ -1,7 +1,7 @@
 """
 Define minecraft Blocks and Schematics; load and save schematics.
 
->>> schem = load_schem("schematic_examples/hdl_diagonal_not.schem")
+>>> schem = load_schem("schematics/diagonal_not.schem")
 >>> pprint(schem)
 Schematic(pos_blocks={Pos(0, 0, 0): Block(block_type='minecraft:oak_wall_sign',
                                           attributes=frozendict.frozendict({'facing': 'north', 'waterlogged': 'false'})),
@@ -49,7 +49,7 @@ from nbtlib import load
 from nbtlib.tag import ByteArray, Compound, Int, Short
 import numpy as np
 
-from redhdl.voxel.positional_data import PositionalData, PositionMask
+from redhdl.voxel.positional_data import PositionalData
 from redhdl.voxel.region import (
     X_AXIS_INDEX,
     Y_AXIS_INDEX,
@@ -57,6 +57,7 @@ from redhdl.voxel.region import (
     Direction,
     Pos,
     RectangularPrism,
+    Region,
     is_direction,
     xz_direction_y_rotated,
 )
@@ -195,7 +196,7 @@ class Schematic:
     def shift_normalized(self) -> "Schematic":
         return self.shifted(-self.rect_region().min_pos)
 
-    def __and__(self, mask: PositionMask) -> "Schematic":
+    def __and__(self, mask: set[Pos] | Region) -> "Schematic":
         return Schematic(
             pos_blocks=self.pos_blocks & mask,
             pos_sign_lines=self.pos_sign_lines & mask,
@@ -207,7 +208,7 @@ class Schematic:
             pos_sign_lines=self.pos_sign_lines | other.pos_sign_lines,
         )
 
-    def __sub__(self, mask: PositionMask) -> "Schematic":
+    def __sub__(self, mask: set[Pos] | Region) -> "Schematic":
         return Schematic(
             pos_blocks=self.pos_blocks - mask,
             pos_sign_lines=self.pos_sign_lines - mask,
@@ -216,7 +217,7 @@ class Schematic:
     def rect_region(self) -> RectangularPrism:
         return self.pos_blocks.rect_region()
 
-    def mask(self) -> PositionMask:
+    def mask(self) -> Region:
         return self.pos_blocks.mask()
 
 
@@ -334,18 +335,24 @@ RGBColor = tuple[int, int, int]
 
 def _block_color(block: Block) -> str:
     block_type_suffix_color: dict[str, str] = {
-        "sign": "brown",
+        "sign": "orange",
         #
         "glass": "cyan",
-        "wool": "navy",
+        "wool": "white",  # navy
         #
         "wire": "crimson",
-        "torch": "red",
-        "repeater": "darkred",
+        "torch": "crimson",
+        "repeater": "grey",
         "comparator": "purple",
         # Shouldn't occur.
         "air": "white",
     }
+
+    # Overrides for I/O wools.
+    if block.block_type == "minecraft:lime_wool":
+        return "green"
+    elif block.block_type == "minecraft:red_wool":
+        return "red"
 
     for block_type_suffix, color in block_type_suffix_color.items():
         if block.block_type.endswith(block_type_suffix):

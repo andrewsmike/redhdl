@@ -4,10 +4,10 @@ from os import system
 from pprint import pprint
 from time import time
 
-from redhdl.bussing import BussingError
-from redhdl.path_search import Step
-from redhdl.redstone_bussing import *
-from redhdl.region import PointRegion, display_regions
+from redhdl.bussing.errors import BussingError
+from redhdl.search.path_search import Step
+from redhdl.bussing.redstone_bussing import *
+from redhdl.voxel.region import PointRegion, display_regions
 
 _DISTANCE = 20
 seen_step_min_costs = {}

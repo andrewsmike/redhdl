@@ -5,6 +5,7 @@ from random import seed
 
 from redhdl.assembly.placement import (
     InstancePlacement,
+    OverlappingPlacementError,
     avg_instance_padding_blocks,
     mutated_placement,
     netlist_random_placement,
@@ -33,9 +34,9 @@ from redhdl.misc.caching import first_id_cached
 from redhdl.netlist.netlist import InstanceId, Netlist
 from redhdl.netlist.netlist_template import (
     InstanceConfig,
-    NetworkSpecs,
+    PortSliceAssignments,
     example_instance_configs,
-    example_network_specs,
+    example_port_slice_assignments,
     netlist_from_simple_spec,
 )
 from redhdl.search.local_search import (
@@ -208,32 +209,46 @@ def mutated_bussable_placement(
 class BussingPlacementProblem(LocalSearchProblem[InstancePlacement]):
     netlist: Netlist
     debug: bool = False
+    max_reasonable_unbussed_cost: int = 70
+    random_placement_opt_steps: int = 256
+    mutation_placement_opt_steps: int = 64
+    max_bussing_steps: int = 25
 
     def random_solution(self) -> InstancePlacement:
         return mutated_unbussable_placement(
             self.netlist,
             netlist_random_placement(self.netlist),
-            total_rounds=2**4 if self.debug else 2**12,
+            total_rounds=self.random_placement_opt_steps,
         )
 
     def mutated_solution(self, solution: InstancePlacement) -> InstancePlacement:
         try:
-            unbussable_cost = unbussable_placement_cost(self.netlist, solution)
-            if unbussable_cost > 200:
-                raise BussingError(
-                    "This looks like a terrible placement. Not attempting to bus."
-                )
-
             # This call should be cached and return (or raise) immediately.
-            bussing = dest_pin_buses(self.netlist, solution)
+            bussing = self.solution_dest_pin_buses(solution)
         except BussingError:
             return mutated_unbussable_placement(
                 self.netlist,
                 solution,
-                total_rounds=2**10,
+                total_rounds=self.mutation_placement_opt_steps,  # 2**10,
             )
         else:
             return mutated_bussable_placement(self.netlist, solution, bussing)
+
+    def solution_dest_pin_buses(self, solution: InstancePlacement):
+        unbussable_cost = unbussable_placement_cost(self.netlist, solution)
+        if unbussable_cost > self.max_reasonable_unbussed_cost:
+            raise BussingError(
+                "This looks like a terrible placement. Not attempting to bus."
+            )
+
+        return dest_pin_buses(self.netlist, solution, self.max_bussing_steps)
+
+    def good_enough(self, solution: InstancePlacement) -> bool:
+        try:
+            self.solution_dest_pin_buses(solution)
+            return True
+        except (OverlappingPlacementError, BussingError):
+            return False
 
     def solution_cost(self, solution: InstancePlacement) -> float:
 
@@ -243,7 +258,7 @@ class BussingPlacementProblem(LocalSearchProblem[InstancePlacement]):
         unbussable_cost = unbussable_placement_cost(self.netlist, solution)
         bussable = False
         try:
-            if unbussable_cost > 275:
+            if unbussable_cost > self.max_reasonable_unbussed_cost:
                 return 100_000 + unbussable_cost
 
             bussing = dest_pin_buses(self.netlist, solution)
@@ -272,11 +287,14 @@ class BussingPlacementProblem(LocalSearchProblem[InstancePlacement]):
                 + pformat(weighted_costs)
             )
 
-            interactive_display_schematic(
-                placement_schematic(self.netlist, solution),
-                "current_placement",
-                desc,
-            )
+            try:
+                interactive_display_schematic(
+                    placement_schematic(self.netlist, solution),
+                    "current_placement",
+                    desc,
+                )
+            except OverlappingPlacementError:
+                print("Failed to save schematic: Overlapping regions.")
 
 
 def schematic_placement_from_netlist(
@@ -297,6 +315,10 @@ def schematic_placement_from_netlist(
             schem = solution_schematic(placement)
             save_schem(schem, path)
 
+        except OverlappingPlacementError as e:
+            print(
+                f"[{round + 1}/{TOTAL_ROUNDS}] Failed to checkpoint due to overlapping instances: {e}"
+            )
         except BussingError as e:
             print(
                 f"[{round + 1}/{TOTAL_ROUNDS}] Failed to checkpoint due to bussing error: {e}"
@@ -326,12 +348,12 @@ def schematic_placement_from_netlist(
 
 def assembled_circuit_schem(
     instance_config: dict[InstanceId, InstanceConfig],
-    network_specs: NetworkSpecs,
+    port_slice_assignments: PortSliceAssignments,
     debug: bool = False,
 ) -> Schematic:
     netlist = netlist_from_simple_spec(
         instance_config=instance_config,
-        network_specs=network_specs,
+        port_slice_assignments=port_slice_assignments,
         output_port_bitwidths={"out": 8},
     )
     return schematic_placement_from_netlist(netlist, debug=debug)[0]
@@ -340,7 +362,7 @@ def assembled_circuit_schem(
 def main():
     schem = assembled_circuit_schem(
         example_instance_configs,
-        example_network_specs,
+        example_port_slice_assignments,
         debug=False,
     )
     save_schem(schem, "output.schem")

@@ -5,9 +5,6 @@ from typing import TypeVar
 
 from redhdl.voxel.region import PointRegion, Pos, RectangularPrism, Region
 
-PositionMask = set[Pos] | Region
-
-
 BlockData = TypeVar("BlockData")
 
 
@@ -49,13 +46,13 @@ class PositionalData(dict[Pos, BlockData]):
         min_pos = self.min_pos() if len(self) > 0 else Pos(0, 0, 0)
         return PositionalData(self.shifted(-min_pos))
 
-    def __and__(self, mask: PositionMask) -> "PositionalData[BlockData]":
+    def __and__(self, mask: set[Pos] | Region) -> "PositionalData[BlockData]":
         return PositionalData((pos, data) for pos, data in self.items() if pos in mask)
 
-    def __sub__(self, mask: PositionMask) -> "PositionalData[BlockData]":
+    def __sub__(self, mask: set[Pos] | Region) -> "PositionalData[BlockData]":
         return PositionalData(
             (pos, data) for pos, data in self.items() if pos not in mask
         )
 
-    def mask(self) -> PositionMask:
+    def mask(self) -> Region:
         return PointRegion(frozenset(self.keys()))

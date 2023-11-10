@@ -9,16 +9,19 @@ Describe your instances and their configuration (here, schematic path):
  'not_out': {'schem_name': 'not_h8b'}}
 
 Specify the I/O relationships between your instances:
->>> pprint(example_network_specs)
-{(('and', 'out'), Slice(0, 8, 1)): {(('not_out', 'in'), Slice(0, 8, 1))},
- (('input', 'a'), Slice(0, 8, 1)): {(('not_a', 'in'), Slice(0, 8, 1))},
- (('input', 'b'), Slice(0, 8, 1)): {(('not_b', 'in'), Slice(0, 8, 1))},
- (('not_a', 'out'), Slice(0, 8, 1)): {(('and', 'a'), Slice(0, 8, 1))},
- (('not_b', 'out'), Slice(0, 8, 1)): {(('and', 'b'), Slice(0, 8, 1))},
- (('not_out', 'out'), Slice(0, 8, 1)): {(('output', 'out'), Slice(0, 8, 1))}}
+>>> pprint(example_port_slice_assignments)
+{(('and', 'a'), Slice(0, 8, 1)): (('not_a', 'out'), Slice(0, 8, 1)),
+ (('and', 'b'), Slice(0, 8, 1)): (('not_b', 'out'), Slice(0, 8, 1)),
+ (('not_a', 'in'), Slice(0, 8, 1)): (('input', 'a'), Slice(0, 8, 1)),
+ (('not_b', 'in'), Slice(0, 8, 1)): (('input', 'b'), Slice(0, 8, 1)),
+ (('not_out', 'in'), Slice(0, 8, 1)): (('and', 'out'), Slice(0, 8, 1)),
+ (('output', 'out'), Slice(0, 8, 1)): (('not_out', 'out'), Slice(0, 8, 1))}
 
 Generate a thoroughly-typed Netlist object, with SchematicInstances, representing your netlist.
->>> netlist = netlist_from_simple_spec(example_instance_configs, example_network_specs)
+>>> netlist = netlist_from_simple_spec(
+...     example_instance_configs,
+...     example_port_slice_assignments,
+... )
 >>> pprint(netlist)
 Netlist(instances={'and': SchematicInstance(...),
                    'input': Instance(ports={}),
@@ -87,27 +90,27 @@ example_instance_configs: dict[InstanceId, InstanceConfig] = {
     "not_out": {"schem_name": "not_h8b"},
 }
 
-NetworkSpecs = dict[tuple[PortId, Slice], set[tuple[PortId, Slice]]]
+PortSliceAssignments = dict[tuple[PortId, Slice], tuple[PortId, Slice]]
 
-example_network_specs: NetworkSpecs = {
-    (("not_a", "out"), Slice(8)): {(("and", "a"), Slice(8))},
-    (("not_b", "out"), Slice(8)): {(("and", "b"), Slice(8))},
-    (("and", "out"), Slice(8)): {(("not_out", "in"), Slice(8))},
-    (("input", "a"), Slice(8)): {(("not_a", "in"), Slice(8))},
-    (("input", "b"), Slice(8)): {(("not_b", "in"), Slice(8))},
-    (("not_out", "out"), Slice(8)): {(("output", "out"), Slice(8))},
+example_port_slice_assignments: PortSliceAssignments = {
+    (("and", "a"), Slice(8)): (("not_a", "out"), Slice(8)),
+    (("and", "b"), Slice(8)): (("not_b", "out"), Slice(8)),
+    (("not_out", "in"), Slice(8)): (("and", "out"), Slice(8)),
+    (("not_a", "in"), Slice(8)): (("input", "a"), Slice(8)),
+    (("not_b", "in"), Slice(8)): (("input", "b"), Slice(8)),
+    (("output", "out"), Slice(8)): (("not_out", "out"), Slice(8)),
 }
 
 
 def netlist_from_simple_spec(
     instance_config: dict[InstanceId, InstanceConfig],
-    network_specs: NetworkSpecs,
+    port_slice_assignments: PortSliceAssignments,
     input_port_bitwidths: dict[str, int] | None = None,
     output_port_bitwidths: dict[str, int] | None = None,
 ) -> Netlist:
     instances = {
         name: schematic_instance_from_schem(
-            load_schem(f"schematic_examples/hdl_{config['schem_name']}.schem")
+            load_schem(f"schematics/{config['schem_name']}.schem")
         )
         for name, config in instance_config.items()
     }
@@ -125,6 +128,11 @@ def netlist_from_simple_spec(
             },
         ),
     }
+
+    network_specs: dict[tuple[PortId, Slice], set[tuple[PortId, Slice]]] = {}
+    for ((dest_port, dest_seq), (src_port, src_seq)) in port_slice_assignments.items():
+        network_specs.setdefault((src_port, src_seq), set()).add((dest_port, dest_seq))
+
     networks = {
         i: Network(
             input_pin_id_seq=PinIdSequence(*driver_seq),

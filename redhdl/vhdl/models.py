@@ -5,7 +5,7 @@ See analysis.py for a more thorough docstring.
 """
 from dataclasses import dataclass
 from pprint import pformat
-from typing import cast
+from typing import NewType, cast
 
 from redhdl.misc.bitrange import (
     BitRange,
@@ -29,9 +29,12 @@ class ConstExpr:
         return f"ConstExpr({self.value})"
 
 
+VHDLVariableName = NewType("VHDLVariableName", str)
+
+
 @dataclass
 class ReferenceExpr:
-    var_name: str
+    var_name: VHDLVariableName
     bitrange: BitRange | None
 
     def __str__(self):
@@ -94,23 +97,31 @@ def validate_assignment_bitrange_expr(
             )
 
 
+VHDLInstanceName = NewType("VHDLInstanceName", str)
+VHDLArchitectureName = NewType("VHDLArchitectureName", str)
+VHDLPortName = NewType("VHDLPortName", str)
+
+
 @dataclass
 class ArchitectureSubinstance:
-    instance_name: str
-    entity_name: str
-    port_exprs: dict[str, dict[BitRange | None, Expression]]
+    instance_name: VHDLInstanceName
+    instance_type: VHDLArchitectureName
+    port_exprs: dict[VHDLPortName, dict[BitRange | None, Expression]]
 
-    def validate_resolved(self, arch_ports: dict[str, dict[str, Port]]):
+    def validate_resolved(
+        self,
+        arch_ports: dict[VHDLArchitectureName, dict[VHDLPortName, Port]],
+    ):
         for port_name, bitrange_exprs in self.port_exprs.items():
-            path = f"{self.entity_name}@{self.instance_name}.{port_name}"
+            path = f"{self.instance_type}@{self.instance_name}.{port_name}"
 
             for bitrange, expr in bitrange_exprs.items():
                 validate_assignment_bitrange_expr(path, bitrange, expr)
 
         for port_name in self.port_exprs.keys():
-            path = f"{self.entity_name}@{self.instance_name}.{port_name}"
+            path = f"{self.instance_type}@{self.instance_name}.{port_name}"
 
-            port = arch_ports[self.entity_name][port_name]
+            port = arch_ports[self.instance_type][port_name]
             assigned_bitranges = cast(
                 set[BitRange], set(self.port_exprs[port_name].keys())
             )
@@ -133,28 +144,28 @@ class ArchitectureSubinstance:
 
 @dataclass
 class Architecture:
-    name: str
+    name: VHDLArchitectureName
 
-    ports: dict[str, Port]
-    subinstances: dict[str, ArchitectureSubinstance]
-    var_bitranges: dict[str, BitRange]
-    var_bitrange_assignments: dict[str, dict[BitRange, Expression]]
+    ports: dict[VHDLPortName, Port]
+    subinstances: dict[VHDLInstanceName, ArchitectureSubinstance]
+    var_bitranges: dict[VHDLVariableName, BitRange]
+    var_bitrange_assignments: dict[VHDLVariableName, dict[BitRange, Expression]]
 
     @property
-    def dependencies(self) -> set[str]:
-        return {subinstance.entity_name for subinstance in self.subinstances.values()}
+    def dependencies(self) -> set[VHDLArchitectureName]:
+        return {subinstance.instance_type for subinstance in self.subinstances.values()}
 
 
 def subinstances_with_resolved_port_bitranges(
-    subinstances: dict[str, ArchitectureSubinstance],
-    arch_ports: dict[str, dict[str, Port]],
-) -> dict[str, ArchitectureSubinstance]:
+    subinstances: dict[VHDLInstanceName, ArchitectureSubinstance],
+    arch_ports: dict[VHDLArchitectureName, dict[VHDLPortName, Port]],
+) -> dict[VHDLInstanceName, ArchitectureSubinstance]:
 
     undeclared_ports = {
         port_name
         for subinst in subinstances.values()
         for port_name in subinst.port_exprs.keys()
-        if port_name not in arch_ports.get(subinst.entity_name, {})
+        if port_name not in arch_ports.get(subinst.instance_type, {})
     }
     if any(undeclared_ports):
         raise ValueError(
@@ -165,13 +176,13 @@ def subinstances_with_resolved_port_bitranges(
     return {
         subinst_name: ArchitectureSubinstance(
             instance_name=subinst.instance_name,
-            entity_name=subinst.entity_name,
+            instance_type=subinst.instance_type,
             port_exprs={
                 port_name: {
                     (
                         bitrange
                         if bitrange is not None
-                        else port_bitrange(arch_ports[subinst.entity_name][port_name])
+                        else port_bitrange(arch_ports[subinst.instance_type][port_name])
                     ): expr
                     for bitrange, expr in bitrange_exprs.items()
                 }
@@ -183,10 +194,10 @@ def subinstances_with_resolved_port_bitranges(
 
 
 def assignments_with_resolved_bitranges(
-    var_bitrange_assignments: dict[str, dict[BitRange | None, Expression]],
-    var_bitranges: dict[str, BitRange],
-    ports: dict[str, Port],
-) -> dict[str, dict[BitRange, Expression]]:
+    var_bitrange_assignments: dict[VHDLVariableName, dict[BitRange | None, Expression]],
+    var_bitranges: dict[VHDLVariableName, BitRange],
+    ports: dict[VHDLPortName, Port],
+) -> dict[VHDLVariableName, dict[BitRange, Expression]]:
     all_bitranges = var_bitranges | {
         port_name: port_bitrange(port) for port_name, port in ports.items()
     }
@@ -213,7 +224,9 @@ def assignments_with_resolved_bitranges(
     }
 
 
-def ordered_arches(arches: dict[str, Architecture]) -> list[str]:
+def ordered_arches(
+    arches: dict[VHDLArchitectureName, Architecture],
+) -> list[VHDLArchitectureName]:
     """
     Using subinstance entity types, determine the correct architecture build order.
 
