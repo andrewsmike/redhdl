@@ -25,6 +25,7 @@ from typing import Any
 
 from redhdl.misc.bitrange import BitRange, bitrange_slice, port_bitrange
 from redhdl.misc.slice import Slice
+from redhdl.netlist.netlist import Instance, Port
 from redhdl.netlist.netlist_template import (
     InstanceConfig,
     InstanceId,
@@ -218,4 +219,38 @@ def netlist_template_from_vhdl_path(
     return (
         instance_configs,
         port_slice_assignments,
+    )
+
+
+_vhdl_stub_template = """\
+module {module_name} ({port_specs_str});
+endmodule"""
+
+
+def _port_spec_str(port: Port, port_name: str) -> str:
+
+    port_type_str = {
+        "in": "input ",
+        "out": "output",
+    }[port.port_type]
+    if port.pin_count == 1:
+        bitrange_expr = ""
+    else:
+        bitrange_expr = f" [{port.pin_count-1: 2} : 0]"
+
+    return f"{port_type_str}{bitrange_expr} {_camel_case(port_name)}"
+
+
+def vhdl_stub_from_instance(instance: Instance, module_name: str) -> str:
+    port_spec_strs = [
+        _port_spec_str(port, port_name) for port_name, port in instance.ports.items()
+    ]
+    if len(port_spec_strs) == 0:
+        port_specs_str = ""
+    else:
+        port_specs_str = "\n\t" + ",\n\t".join(port_spec_strs) + "\n"
+
+    return _vhdl_stub_template.format(
+        module_name=_camel_case(module_name),
+        port_specs_str=port_specs_str,
     )
