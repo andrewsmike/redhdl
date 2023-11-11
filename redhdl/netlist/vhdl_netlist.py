@@ -228,11 +228,13 @@ endmodule"""
 
 
 def _port_spec_str(port: Port, port_name: str) -> str:
+    """The SystemVerilog module argument string for a given port."""
 
     port_type_str = {
         "in": "input ",
         "out": "output",
     }[port.port_type]
+
     if port.pin_count == 1:
         bitrange_expr = ""
     else:
@@ -242,9 +244,12 @@ def _port_spec_str(port: Port, port_name: str) -> str:
 
 
 def vhdl_stub_from_instance(instance: Instance, module_name: str) -> str:
+    """The SystemVerilog string for a module stub for a given instance."""
+
     port_spec_strs = [
         _port_spec_str(port, port_name) for port_name, port in instance.ports.items()
     ]
+
     if len(port_spec_strs) == 0:
         port_specs_str = ""
     else:

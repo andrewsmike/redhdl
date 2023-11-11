@@ -35,26 +35,15 @@ def dest_pin_buses(
     dest_pin_buses: PinBuses = {}
     for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement):
         other_buses = reduce(operator.or_, dest_pin_buses.values(), RedstoneBussing())
-        try:
-            bussing = redstone_bussing(
-                start_pos=pin_pos_pair.source_pin_pos,
-                end_pos=pin_pos_pair.dest_pin_pos,
-                start_xz_dir=pin_pos_pair.source_pin_facing,
-                end_xz_dir=pin_pos_pair.dest_pin_facing,
-                instance_points=instance_region_points,
-                other_buses=other_buses,
-                max_steps=max_bussing_steps,
-            )
-        except BaseException:
-            from time import time
-
-            from redhdl.voxel.schematic import save_schem
-
-            save_schem(
-                bussed_placement_schematic(netlist, placement, dest_pin_buses),
-                f"checkpoints/failed_{time()}.schem",
-            )
-            raise
+        bussing = redstone_bussing(
+            start_pos=pin_pos_pair.source_pin_pos,
+            end_pos=pin_pos_pair.dest_pin_pos,
+            start_xz_dir=pin_pos_pair.source_pin_facing,
+            end_xz_dir=pin_pos_pair.dest_pin_facing,
+            instance_points=instance_region_points,
+            other_buses=other_buses,
+            max_steps=max_bussing_steps,
+        )
 
         dest_pin_buses[pin_pos_pair.dest_pin_id] = bussing
 

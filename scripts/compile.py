@@ -2,6 +2,7 @@
 
 from argparse import ArgumentParser
 from glob import glob
+from random import seed
 from re import match
 from string import ascii_uppercase
 from subprocess import run
@@ -47,6 +48,8 @@ def regenerate_stub_file():
 
 
 def assemble_module(module_name: str):
+
+    seed(1337)
 
     vhdl_path = f"build/{module_name}.vhdl"
     sv_to_vhdl_command_parts = [
