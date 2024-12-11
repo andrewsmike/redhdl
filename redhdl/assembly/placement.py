@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 from redhdl.misc.caching import first_id_cached
 from redhdl.netlist.instances import SchematicInstance
-from redhdl.netlist.netlist import InstanceId, Netlist, PinId, PinIdSequence
+from redhdl.netlist.netlist import IOInstance, InstanceId, Netlist, PinId, PinIdSequence
 from redhdl.search.local_search import (
     LocalSearchProblem,
     sim_annealing_searched_solution,
@@ -94,27 +94,35 @@ def placement_pin_seq_points(
 ) -> PositionSequence:
     """
     The position sequence corresponding to the given PinIdSequence in a given placement.
+    Inputs / outputs are projected onto the nearest horizontal edge of the enclosing
+    rectangular prism.
     """
     instance_id, port_name = pin_id_seq.port_id
     instance = netlist.instances[instance_id]
     port = instance.ports[port_name]
 
-    if not isinstance(instance, SchematicInstance):
+    if isinstance(instance, SchematicInstance):
+        port_placement = instance.port_placement[port_name]
+
+        wire_points = (
+            port_placement.positions & pin_id_seq.slice
+        ) + port_placement.port_interface.wire_offset(port.port_type)
+
+        instance_id, _ = pin_id_seq.port_id
+        instance_pos, instance_dir = placement[instance_id]
+
+        return wire_points.y_rotated(xz_directions.index(instance_dir)) + instance_pos
+
+    elif isinstance(instance, IOInstance):
+        average_dest_pin = PosSeq()
+        for dest_pin_id_seq in blah:
+            placement_pin_seq_points(netlist, dest_pin_id_seq, placement)
+        project_pin_seq_to_nearest_wall()
+    else:
         raise ValueError(
-            "Attempted to find pin position sequence for an Instance that wasn't a "
-            + "SchematicInstance."
+            "Attempted to find pin position sequence for an Instance that wasn't an "
+            + "IO or SchematicInstance."
         )
-
-    port_placement = instance.port_placement[port_name]
-
-    wire_points = (
-        port_placement.positions & pin_id_seq.slice
-    ) + port_placement.port_interface.wire_offset(port.port_type)
-
-    instance_id, _ = pin_id_seq.port_id
-    instance_pos, instance_dir = placement[instance_id]
-
-    return wire_points.y_rotated(xz_directions.index(instance_dir)) + instance_pos
 
 
 @dataclass(frozen=True, order=True)

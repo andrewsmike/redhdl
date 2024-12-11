@@ -114,6 +114,11 @@ class Instance:
     ports: dict[str, Port]
 
 
+@dataclass
+class IOInstance(Instance):
+    """IOInstances have no additional metadata."""
+
+
 PortName = str
 InstanceId = str
 PortId = tuple[InstanceId, PortName]
@@ -425,14 +430,8 @@ class Netlist:
         """All non-I/O PinIdSequence -> PinIdSequence pairs."""
 
         for network_id, network in self.networks.items():
-            instance_id, port_name = network.input_pin_id_seq.port_id
-            if instance_id == "input":
-                continue
-
             for dest_pin_id_seq in network.output_pin_id_seqs:
                 instance_id, port_name = dest_pin_id_seq.port_id
-                if instance_id == "output":
-                    continue
 
                 yield (network.input_pin_id_seq, dest_pin_id_seq)
 
