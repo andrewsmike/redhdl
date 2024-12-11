@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 from redhdl.misc.caching import first_id_cached
 from redhdl.netlist.instances import SchematicInstance
-from redhdl.netlist.netlist import IOInstance, InstanceId, Netlist, PinId, PinIdSequence
+from redhdl.netlist.netlist import InstanceId, IOInstance, Netlist, PinId, PinIdSequence
 from redhdl.search.local_search import (
     LocalSearchProblem,
     sim_annealing_searched_solution,
