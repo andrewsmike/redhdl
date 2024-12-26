@@ -77,11 +77,15 @@ Search stuff:
 
 Bussing:
 - bussing/errors.py: Bussing error types.
-- bussing/naive_bussing.py: Heuristic simple pathfinding problem methods.
-    - Only routes a single block path, rather than a real redstone wire.
-    - Has a variety of useful cost heuristics and Path definitions.
-    - Has a collision-relaxed solver for searching multiple paths simultaneously.
 - bussing/redstone_bussing.py: Experimental fully-featured redstone wire path search problem.
+    - Only handles a single wire at a time.
+- bussing/naive_bussing.py: Bussing cost heuristics and bussing wires in groups.
+    - Handlers for applying redstone_bussing in groups, converting to schematics.
+    - Variety of fast placement + netlist based heuristics for minimum bussing cost.
+    - Variety of bussing solution cost measurements.
+    - TODO: Should be separated into heuristics and placement+netlist <==> redstone_bussing logic.
+    - BIAS WIREABLE PLACEMENT MUTATIONS TOWARDS WIRE-TIGHTENING
+    - FIND FAST-FAIL VERSIONS OF BUSSING
 
 Assembly:
 - assembly/placement.py: Bussing-naive component placement logic and solvers.
@@ -93,23 +97,36 @@ Assembly:
 - assembly/assembly.py: Heuristic joint placement and (naive-wire-only) bus search.
 
 
-WHAT'S MISSING:
-- schematic_instance: Support for diagonal circuits.
-- region.py: Supporting polyhedral regions for diagonal circuits would allow us to switch
-    from PointRegions to a more efficient representation.
+TODO:
+- Give redstone_bussing tools to handle diverging busses (TBD how).
 
-- redstone_bussing.py:
-    - Current representation is insufficiently efficient
-        - Optimizing this will be challenging - busses have more state than simple paths.
-        - Busses are also _rather_ complicated in their constraints.
-        - Might be able to use naive path-finding as a first-pass.
-    - No multi-wire / relaxed / herd search.
+- Redstone descending bug (woops)
 
-- assembly.py:
-    - Must be improved and adapted to handle real redstone_bussing.
-    - Must be adapted to handle hierarchical Netlists (with proper deduplication).
-        - Possibly consider repartitioning using minimum-cut hierarchical clustering or
-            fancy force-based model.
+- Have per-input input instances. Place them like regular instances.
+    - For hier placement: Either:
+        - force them to be on the edge, or
+        - improve collision detection and leave them internal [medium term goal :check:]
 
-- Schematic library: Must be built out!
-- vhdl: Must get to the point where a hierarchical Netlist can be generated!
+- Put together: Hierarchically generate Netlists in order.
+
+- VHDL: Actual assignment resolution logic
+    - Concat, reference
+- VHDL: Inject simple expression instances, constant instances
+
+- schematic_instance: Support for diagonal circuits. Use points, ha'spaces, or meshes
+
+- Build out schematic library
+
+- Support templated schematics
+
+- ... Support SV sim + testing by mirroring redstone builds in SV :rofl:
+    - You could also test against python
+    - You could also test against redstone schematics using redstone SAT :acts-distracted:
+
+- Synthesize stack of netlists simultaneously / more efficiently?
+    - Consider repartitioning using minimum-cut hierarchical clustering or
+        fancy force-based model to synthesize hierarchies more effectively
+
+- Speed up redstone bussing and heuristic placement?
+    - Reduce decision points
+    - Implement multi-wire / relaxed / herd search
