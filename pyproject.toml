@@ -22,9 +22,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "black",
-    "flake8",
-    "isort",
+    "ruff",
     "mypy",
     "pytest",
     "pytest-cov",
@@ -40,7 +38,7 @@ display_vhdl = "redhdl.parser.vhdl:display_example_program"
 
 [tool.black]
 extend-exclude = '''
-^.*/(ascii_dag|autogen|vhdlLexer.py|vhdlVisitor.py|vhdlParser.py|vhdlParserVisitor.py|vhdlParserListener.py)$
+^.*/(ascii_dag|autogen|vhdlLexer.py|vhdlListener.py|vhdlVisitor.py|vhdlParser.py|vhdlParserVisitor.py|vhdlParserListener.py)$
 '''
 
 [tool.isort]
@@ -56,6 +54,7 @@ skip = [
     "redhdl/ascii_dag.py",
     "redhdl/vhdl/autogen",
     "redhdl/vhdl/vhdlLexer.py",
+    "redhdl/vhdl/vhdlListener.py",
     "redhdl/vhdl/vhdlParser.py",
     "redhdl/vhdl/vhdlVisitor.py",
     "redhdl/vhdl/vhdlParserVisitor.py",
@@ -75,3 +74,51 @@ filterwarnings = "ignore::DeprecationWarning"
 [tool.pydocstyle]
 match-dir = "(?!parser)(?!\\.).*"
 match = "(?!test_)(?!ascii_dag).*\\.py"
+
+
+[tool.ruff]
+line-length = 88
+exclude = [
+    "redhdl/misc/ascii_dag.py",
+    "redhdl/vhdl/autogen",
+    "redhdl/vhdl/vhdlParser.py",
+    "redhdl/vhdl/vhdlLexer.py",
+    "redhdl/vhdl/vhdlListener.py",
+    "redhdl/vhdl/vhdlVisitor.py",
+    "redhdl/vhdl/vhdlParserVisitor.py",
+    "redhdl/vhdl/vhdlParserListener.py",
+]
+
+
+[tool.ruff.lint]
+# Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
+# overlap with the use of a formatter, like Black, but we can override this behavior by
+# explicitly adding the rule.
+select = [
+    "B",  # flake8-bugbear
+    "C", # ?!
+    "E",  # pycodestyle
+    "F",  # pyflakes
+    "W",  # ?!?
+    "I",  # isort
+    "SIM",  # flake8-simplify
+    "UP",   # pyupgrade
+]
+extend-select = ["E501"]
+ignore = [
+    "E203",
+    "E266",
+    "E501",
+    "F841",
+    "SIM118",  # Being explicit when iterating over dict .keys() honestly seems clearer to me
+]
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 20
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+# multi-line-output = 3
+
+known-first-party = ["redhdl"]
