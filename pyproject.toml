@@ -1,6 +1,46 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["redhdl"]
+include-package-data = true
+
+[project]
+name = "redhdl"
+version = "0.1.0"
+description = "SystemVerilog to redstone compiler."
+readme = "README.md"
+dependencies = [
+    "antlr4-python3-runtime==4.9.3",
+    "frozendict",
+    "graphviz",
+    "grandalf",
+    "nbtlib",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+test = [
+    "black",
+    "flake8",
+    "isort",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "pytest-custom_exit_code",
+    "types-frozendict",
+]
+
+
+
+[project.scripts]
+display_vhdl = "redhdl.parser.vhdl:display_example_program"
+
+
 [tool.black]
 extend-exclude = '''
-^.*/(ascii_dag|autogen|vhdlLexer.py|vhdlParser.py|vhdlParserVisitor.py|vhdlParserListener.py)$
+^.*/(ascii_dag|autogen|vhdlLexer.py|vhdlVisitor.py|vhdlParser.py|vhdlParserVisitor.py|vhdlParserListener.py)$
 '''
 
 [tool.isort]
@@ -17,6 +57,7 @@ skip = [
     "redhdl/vhdl/autogen",
     "redhdl/vhdl/vhdlLexer.py",
     "redhdl/vhdl/vhdlParser.py",
+    "redhdl/vhdl/vhdlVisitor.py",
     "redhdl/vhdl/vhdlParserVisitor.py",
     "redhdl/vhdl/vhdlParserListener.py",
 ]
