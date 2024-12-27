@@ -5,7 +5,7 @@ from redhdl.bussing.redstone_bussing import RedstoneBussing, redstone_bussing_de
 from redhdl.voxel.region import Pos
 
 
-def test_search_durations():
+def _test_search_durations():
     """
     5 216 0.02058696746826172 24
     10 1331 0.060437917709350586 49

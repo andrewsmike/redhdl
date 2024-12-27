@@ -27,6 +27,7 @@ failure.
 from abc import ABCMeta, abstractmethod
 from collections.abc import Generator
 from dataclasses import dataclass, field
+from functools import cached_property
 from heapq import heappop, heappush
 from math import inf
 from typing import Generic, Literal, Optional, TypeVar
@@ -108,20 +109,36 @@ class Step(Generic[State, Action]):
     def depth(self) -> int:
         return len(self.action_sequence())
 
+    @cached_property
+    def key(self) -> tuple[float, float]:
+        """
+        The sorting key for Steps.
+
+        At every point, BFS search methods will explore the state that looks the most
+        promising. In _strict_ priority order, the most promising state is the one that:
+
+        - Has the lowest (realized+remaining lower bound) cost to the finish.
+            This is necessary for correctness, and must be the first criteria.
+        - Has the highest _realized_ cost.
+            There are often _many_ functionally-identical paths. This focuses the search
+            on the most developed routes, rather than doing useless exploration.
+        """
+        return (self.min_cost, -self.cost)
+
     def __eq__(self, other) -> bool:
-        return self.min_cost == other.min_cost
+        return self.key == other.key
 
     def __lt__(self, other) -> bool:
-        return self.min_cost < other.min_cost
+        return self.key < other.key
 
     def __le__(self, other) -> bool:
-        return self.min_cost <= other.min_cost
+        return self.key <= other.key
 
     def __gt__(self, other) -> bool:
-        return self.min_cost > other.min_cost
+        return self.key > other.key
 
     def __ge__(self, other) -> bool:
-        return self.min_cost >= other.min_cost
+        return self.key >= other.key
 
 
 class SearchError(BaseException):
@@ -227,7 +244,7 @@ def a_star_bfs_searched_solution(
 
     explored_states: set[State] = set()
 
-    remaining_steps: int = max_steps
+    remaining_steps = max_steps
     while len(next_best_action_heap) > 0 and remaining_steps > 0:
         step = heappop(next_best_action_heap)
         if step.state in explored_states:

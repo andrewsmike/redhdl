@@ -21,7 +21,7 @@ Port describing signs:
     sophisticated bus connecter logic.
 
 >>> from redhdl.voxel.schematic import load_schem
->>> schem = load_schem("schematic_examples/hdl_diagonal_not.schem")
+>>> schem = load_schem("schematics/diagonal_not.schem")
 >>> pprint(schem)
 Schematic(pos_blocks={Pos(0, 0, 0): Block(block_type='minecraft:oak_wall_sign',
                                           attributes=frozendict.frozendict({'facing': 'north', 'waterlogged': 'false'})),
@@ -53,7 +53,7 @@ SchematicInstance(ports={'a': Port(port_type='in', pin_count=1),
                                                      port_interface=RepeaterPortInterface(facing='south')),
                                   'b': PortPlacement(positions=PositionSequence(Pos(2, 0, 2), Pos(2, 0, 2), count=1),
                                                      port_interface=RepeaterPortInterface(facing='south'))})
->>> and_schem = load_schem("schematic_examples/hdl_and_h8b.schem")
+>>> and_schem = load_schem("schematics/and_h8b.schem")
 >>> pprint(schematic_instance_from_schem(and_schem))
 SchematicInstance(ports={'a': Port(port_type='in', pin_count=8),
                          'b': Port(port_type='in', pin_count=8),
@@ -68,7 +68,7 @@ SchematicInstance(ports={'a': Port(port_type='in', pin_count=8),
                                   'out': PortPlacement(positions=PositionSequence(Pos(0, 1, 2), Pos(14, 1, 2), count=8),
                                                        port_interface=RepeaterPortInterface(facing='south'))})
 
->>> not_schem = load_schem("schematic_examples/hdl_not_h8b.schem")
+>>> not_schem = load_schem("schematics/not_h8b.schem")
 >>> pprint(schematic_instance_from_schem(not_schem))
 SchematicInstance(ports={'in': Port(port_type='in', pin_count=8),
                          'out': Port(port_type='out', pin_count=8)},
