@@ -168,7 +168,7 @@ def source_dest_pin_pos_pairs(
     return results
 
 
-class OverlappingPlacementError(BaseException):
+class OverlappingPlacementError(Exception):
     pass
 
 

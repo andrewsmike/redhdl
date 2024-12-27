@@ -141,7 +141,7 @@ class Step(Generic[State, Action]):
         return self.key >= other.key
 
 
-class SearchError(BaseException):
+class SearchError(Exception):
     pass
 
 

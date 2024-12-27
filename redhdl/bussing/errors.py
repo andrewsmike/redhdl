@@ -1,7 +1,7 @@
 """Bussing error types."""
 
 
-class BussingError(BaseException):
+class BussingError(Exception):
     """Any bussing-related problem."""
 
 

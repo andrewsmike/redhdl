@@ -1,4 +1,4 @@
-class VHDLError(BaseException):
+class VHDLError(Exception):
     pass
 
 
