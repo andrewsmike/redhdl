@@ -5,7 +5,7 @@ repos:
         name: prebuild
         stages: [pre-commit]
         language: system
-        entry: make build
+        entry: make build NO_TTY=true
         pass_filenames: false
         files: ".*"
 
@@ -13,7 +13,7 @@ repos:
         name: vhdl_parser
         stages: [pre-commit]
         language: system
-        entry: make vhdl_parser
+        entry: make vhdl_parser NO_TTY=true
         pass_filenames: false
         files: "^redhdl/parser/"
 
@@ -21,7 +21,7 @@ repos:
         name: lint
         stages: [pre-commit]
         language: system
-        entry: make lint
+        entry: make lint NO_TTY=true
         types: [python]
         pass_filenames: false
         files: ".*"
@@ -30,7 +30,7 @@ repos:
         name: test
         stages: [pre-commit]
         language: system
-        entry: make test
+        entry: make test NO_TTY=true
         types: [python]
         pass_filenames: false
         files: ".*"

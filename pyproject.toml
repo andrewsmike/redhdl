@@ -16,6 +16,7 @@ dependencies = [
     "frozendict",
     "graphviz",
     "grandalf",
+    "matplotlib",
     "nbtlib",
     "tqdm",
 ]
