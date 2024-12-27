@@ -1,6 +1,7 @@
 """
 Simplified parse-tree to replace antlr's overly-robust ParseTree implementation.
 """
+
 from dataclasses import dataclass, field
 from functools import wraps
 from pprint import pformat, pprint
@@ -236,7 +237,6 @@ def next_child(
     step: int | str,
     raise_on_ambiguous: bool = True,
 ) -> ParseTree | None:
-
     if isinstance(step, int):
         if len(children) <= step:
             return None

@@ -1,18 +1,22 @@
 #!/usr/bin/env python
 
-from os import system
+from logging import getLogger
 from pprint import pprint
 from time import time
 
-from redhdl.bussing.errors import BussingError
+from redhdl.bussing.redstone_bussing import (
+    RedstoneBussing,
+    RedstonePathFindingProblem,
+    redstone_bussing_details,
+)
 from redhdl.search.path_search import Step
-from redhdl.bussing.redstone_bussing import *
-from redhdl.voxel.region import PointRegion, display_regions
+from redhdl.voxel.region import Pos
 
 _DISTANCE = 20
 seen_step_min_costs = {}
 
-def display_step(step: Step, problem, x_range, y_range):
+
+def display_step(step: Step, problem, x_range, y_range):  # noqa: C901
     min_x, max_x = x_range
     min_y, max_y = y_range
     curr_step = step
@@ -22,7 +26,10 @@ def display_step(step: Step, problem, x_range, y_range):
     repeater_poses = set()
     while curr_step is not None:
         if curr_step.action is not None:
-            bus_pos_costs_min_costs[curr_step.action.next_pos] = (curr_step.cost, curr_step.min_cost)
+            bus_pos_costs_min_costs[curr_step.action.next_pos] = (
+                curr_step.cost,
+                curr_step.min_cost,
+            )
             seen_step_min_costs[curr_step.action.next_pos] = min(
                 seen_step_min_costs.get(curr_step.action.next_pos, 1000000000),
                 curr_step.min_cost,
@@ -53,7 +60,7 @@ def display_step(step: Step, problem, x_range, y_range):
     # for pos, min_cost in seen_step_min_costs.items():
     #     pos_symbol[(pos[0], pos[2])] = str(min_cost)
 
-    for pos, (cost, min_cost) in bus_pos_costs_min_costs.items():
+    for pos, (_cost, min_cost) in bus_pos_costs_min_costs.items():
         dy = (pos - pos_prev_pos.get(pos, problem.start_pos)).y
         if dy > 0:
             dir_sym = "^"
@@ -66,16 +73,10 @@ def display_step(step: Step, problem, x_range, y_range):
         else:
             pos_symbol[(pos[0], pos[2])] = f"<{min_cost}{dir_sym}>"
 
-
     pprint(step.action)
     pprint(set(bus_pos_costs_min_costs.keys()))
     for y in range(max_y, min_y - 1, -1):
-        print(
-            "".join(
-                f"{pos_symbol.get((x, y), ''):^5}"
-                for x in range(min_x, max_x)
-            )
-        )
+        print("".join(f"{pos_symbol.get((x, y), ''):^5}" for x in range(min_x, max_x)))
     if step.parent_step is not None:
         problem.state_action_cost(step.parent_step.state, step.action)
     print(f"Current cost: {step.cost}")
@@ -102,11 +103,8 @@ def main():
     )
     duration = time() - start_time
 
-
     expansion_steps = [
-        step.step
-        for step in algo_steps
-        if step.algo_action == "expanding_step"
+        step.step for step in algo_steps if step.algo_action == "expanding_step"
     ]
 
     print(_DISTANCE, (_DISTANCE + 1) ** 3, duration, len(expansion_steps))

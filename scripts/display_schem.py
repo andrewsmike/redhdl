@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 from redhdl.voxel.schematic import display_schematic, load_schem
 
+
 def main(schem_path, desc_file_path: str | None):
     plt.ion()
 
@@ -14,7 +15,7 @@ def main(schem_path, desc_file_path: str | None):
             schem = load_schem(schem_path)
 
             if desc_file_path is not None:
-                with open(desc_file_path, "r") as desc_file:
+                with open(desc_file_path) as desc_file:
                     desc = desc_file.read()
             else:
                 desc = ""

@@ -1,15 +1,17 @@
 """
 Tools for parsing vhdl using an ANTLR-generated parser.
 """
+
+from collections.abc import Iterable
 from os.path import dirname, join
 from pprint import pformat
 from sys import argv
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Callable, Optional
 
 from antlr4.CommonTokenStream import CommonTokenStream
+from antlr4.error.ErrorListener import ErrorListener
 from antlr4.FileStream import FileStream
 from antlr4.InputStream import InputStream
-from antlr4.error.ErrorListener import ErrorListener
 from antlr4.tree.Tree import ParseTree
 from antlr4.tree.Trees import Trees
 from graphviz import Digraph

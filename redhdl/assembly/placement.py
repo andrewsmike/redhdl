@@ -7,6 +7,7 @@ more advanced and adaptive bussing-aware search.
 
 Placement is SchematicInstance specific and provides schematic-specific helpers.
 """
+
 from dataclasses import dataclass
 from functools import reduce
 from operator import or_
@@ -139,7 +140,6 @@ def source_dest_pin_pos_pairs(
     results: list[PinPosPair] = []
 
     for source_pin_id_seq, dest_pin_id_seq in netlist.source_dest_pin_id_seq_pairs():
-
         source_pin_points = placement_pin_seq_points(
             netlist, source_pin_id_seq, placement
         )
@@ -204,7 +204,7 @@ def display_placement(netlist: Netlist, placement: InstancePlacement):
     )
     dest_poses = frozenset(pin_pos_pair.dest_pin_pos for pin_pos_pair in pin_pos_pairs)
 
-    ordered_instance_ids = list(sorted(placement.keys()))
+    ordered_instance_ids = sorted(placement.keys())
     display_regions(
         *(
             placement_instance_region(netlist, placement, instance_id)
@@ -239,13 +239,11 @@ def netlist_random_placement(netlist: Netlist) -> InstancePlacement:
     max_area: Pos = sum(
         (instance.region.max_pos + Pos(1, 1, 1) for instance in instances.values()),
         start=Pos(0, 0, 0),
-    ) + Pos(
-        8, 8, 8
-    )  # TODO: Make less arbitrary.
+    ) + Pos(8, 8, 8)  # TODO: Make less arbitrary.
 
     placement: InstancePlacement = frozendict()
     for instance_name, instance in instances.items():
-        for i in range(MAX_PLACEMENT_ATTEMPTS):
+        for _attempt_index in range(MAX_PLACEMENT_ATTEMPTS):
             pos = random_pos(max_area - instance.region.max_pos - Pos(1, 1, 1))
             direction = choice(xz_directions)
             assert is_direction(direction)  # For MyPy.
@@ -292,7 +290,6 @@ def avg_instance_padding_blocks(
     instance_count = len(composite_region.subregions)  # Denominator
 
     for instance_region in composite_region.subregions:
-
         other_regions = CompositeRegion(
             tuple(
                 subregion
@@ -343,7 +340,7 @@ direction_unit_poses = list(direction_unit_pos.values())
 
 
 def mutated_individual_placement(
-    placement: tuple[Pos, Direction]
+    placement: tuple[Pos, Direction],
 ) -> tuple[Pos, Direction]:
     direction: str | Direction
     pos, direction = placement

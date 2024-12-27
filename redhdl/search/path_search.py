@@ -23,11 +23,13 @@ Once problems are specified, we provide two search methods for problems:
 These methods raise the SearchErrors NoSolutionError and SearchTimeoutError on
 failure.
 """
+
 from abc import ABCMeta, abstractmethod
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from heapq import heappop, heappush
 from math import inf
-from typing import Generator, Generic, Literal, Optional, TypeVar
+from typing import Generic, Literal, Optional, TypeVar
 
 State = TypeVar("State")
 Action = TypeVar("Action")
@@ -134,7 +136,8 @@ class SearchTimeoutError(SearchError):
     pass
 
 
-def a_star_iddfs_searched_solution(
+# TODO: Consider simplifying.
+def a_star_iddfs_searched_solution(  # noqa: C901
     problem: PathSearchProblem[State, Action],
     max_steps: int = 10_000,
 ) -> list[Action]:
@@ -160,7 +163,6 @@ def a_star_iddfs_searched_solution(
         step: Step,
         max_cost: float,
     ) -> tuple[Step | None, bool, float | None]:
-
         nonlocal state_min_cost
         prev_min_cost = state_min_cost.get(step.state, inf)
         if step.cost > prev_min_cost:
@@ -220,7 +222,6 @@ def a_star_bfs_searched_solution(
     problem: PathSearchProblem[State, Action],
     max_steps: int = 10_000,
 ) -> list[Action]:
-
     first_step = Step.initial_step(problem.initial_state())
     next_best_action_heap = [first_step]
 

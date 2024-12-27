@@ -1,7 +1,6 @@
 from contextlib import ExitStack, contextmanager
-from dataclasses import field, dataclass
+from dataclasses import dataclass
 from time import time
-from typing import Generic, Literal
 from unittest.mock import patch
 
 from redhdl.search.path_search import (
@@ -60,9 +59,6 @@ class PlanarPathSearchProblem(PathSearchProblem[Pos, Direction]):
 
         lines = []
         for z in range(min_z, max_z + 1):
-            wall_poses: set[Pos]
-            start_pos: Pos
-            end_pos: Pos
             line = ""
             for x in range(min_x, max_x + 1):
                 pos = Pos(x, 0, z)
@@ -91,16 +87,16 @@ class PlanarPathSearchProblem(PathSearchProblem[Pos, Direction]):
         return current_pos == self.end_pos
 
 
-problem_map = """\
-         e
-          
-########  
-       #  
-       #  
-       #  
-s      #  
-       #  \
-"""
+problem_map = (
+    "         e"
+    + +"          "
+    + "########  "
+    + "       #  "
+    + "       #  "
+    + "       #  "
+    + "s      #  "
+    + "       #  "
+)
 
 
 def planar_path_problem_search_from_map(problem_map: str) -> PlanarPathSearchProblem:
@@ -139,7 +135,7 @@ def test_bfs_search():
 
 def test_bfs_efficiency():
     start_time = time()
-    for i in range(100):
+    for _round_index in range(100):
         a_star_bfs_searched_solution(planar_path_problem)
     end_time = time()
 
@@ -156,7 +152,7 @@ def test_iddfs_search():
 
 def test_iddfs_efficiency():
     start_time = time()
-    for i in range(100):
+    for _round_index in range(100):
         a_star_iddfs_searched_solution(planar_path_problem)
     end_time = time()
 
@@ -384,7 +380,7 @@ def print_benchmarks():
             }[algo_name]
 
             start_time = time()
-            for i in range(100):
+            for _round_index in range(100):
                 algo(problem)
 
             end_time = time()

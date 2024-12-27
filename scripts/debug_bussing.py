@@ -1,29 +1,28 @@
-import operator
-from frozendict import frozendict
 from functools import reduce
+import operator
 
+from frozendict import frozendict
+from visualize_bussing import display_step
 
-from redhdl.netlist.netlist_template import (
-    example_instance_configs,
-    example_network_specs,
-    netlist_from_simple_spec,
-)
 from redhdl.assembly.placement import (
     placement_region,
     source_dest_pin_pos_pairs,
-)
-from redhdl.bussing.redstone_bussing import (
-    RedstoneBussing,
-    redstone_bussing_details,
 )
 from redhdl.bussing.naive_bussing import (
     PinBuses,
     bussed_placement_schematic,
 )
-from redhdl.voxel.region import Pos, PointRegion, display_regions
+from redhdl.bussing.redstone_bussing import (
+    RedstoneBussing,
+    redstone_bussing_details,
+)
+from redhdl.netlist.netlist_template import (
+    example_instance_configs,
+    example_network_specs,
+    netlist_from_simple_spec,
+)
+from redhdl.voxel.region import PointRegion, Pos, display_regions
 from redhdl.voxel.schematic import save_schem
-
-from visualize_bussing import display_step
 
 
 def main():
@@ -54,7 +53,6 @@ def main():
     placement = example_placements[placement_name]
 
     instances_region = placement_region(netlist, placement).xz_padded(1)
-    instance_region_points = instances_region.region_points()
 
     display_regions(*instances_region.subregions)
 
@@ -73,21 +71,16 @@ def main():
             end_pos=pin_pos_pair.dest_pin_pos,
             start_xz_dir=pin_pos_pair.source_pin_facing,
             end_xz_dir=pin_pos_pair.dest_pin_facing,
-            instance_points=instance_region_points,
+            instance_points=instances_region.points,
             other_buses=other_buses,
             max_steps=2500,
         )
 
-
         expansion_steps = [
-            step.step
-            for step in algo_steps
-            if step.algo_action == "expanding_step"
+            step.step for step in algo_steps if step.algo_action == "expanding_step"
         ]
 
-        debug = (
-            pin_pos_pair.source_pin_id == interesting_source_pin_id
-        )
+        debug = pin_pos_pair.source_pin_id == interesting_source_pin_id
 
         if debug:
             for expansion_step in expansion_steps:
@@ -103,9 +96,11 @@ def main():
                     input()
                 except KeyboardInterrupt:
                     import pdb
+
                     pdb.set_trace()
 
             import pdb
+
             pdb.set_trace()
 
         if bussing is None:
@@ -115,7 +110,10 @@ def main():
 
     display_regions(
         *instances_region.subregions,
-        *(PointRegion(frozenset(bus.element_blocks)) for bus in dest_pin_buses.values()),
+        *(
+            PointRegion(frozenset(bus.element_blocks))
+            for bus in dest_pin_buses.values()
+        ),
     )
 
     schem = bussed_placement_schematic(netlist, placement, dest_pin_buses)

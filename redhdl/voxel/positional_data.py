@@ -1,6 +1,7 @@
 """
 Positional data: 3d cell (meta)data manipulations.
 """
+
 from typing import TypeVar
 
 from redhdl.voxel.region import PointRegion, Pos, RectangularPrism, Region

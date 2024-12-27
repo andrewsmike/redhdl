@@ -20,6 +20,7 @@ TODO
         - Have them pull in the stride from the input/output
 - Propagate preferred bitwidth across networks / between netlists for generated / logical units
 """
+
 from string import ascii_uppercase
 from typing import Any
 
@@ -60,7 +61,6 @@ def _snake_from_camel(value: str) -> str:
 
 
 def _normalized_vhdl_name(value: str) -> str:
-
     value = _snake_from_camel(value)
 
     for padding_name in [
@@ -85,7 +85,8 @@ def _normalized_port_bitrange(
     )
 
 
-def netlist_template_from_vhdl_path(
+# TODO: Simplify and break apart this method.
+def netlist_template_from_vhdl_path(  # noqa: C901
     vhdl_path: str, module_name: str
 ) -> tuple[dict[InstanceId, InstanceConfig], PortSliceAssignments]:
     arches = arches_from_vhdl_path(vhdl_path)

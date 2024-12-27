@@ -33,9 +33,20 @@ There's an ideal density score for each region.
 complicated.)
 
 Examples:
->>> bussing, problem, states, steps, costs, algo_steps = redstone_bussing_details(
-...     start_pos=Pos(0, 0, 0),
-...     end_pos=Pos(3, 2, 2),
+>>> (
+...     bussing,
+...     problem,
+...     states,
+...     steps,
+...     costs,
+...     algo_steps,
+... ) = redstone_bussing_details(
+...     start_pos=Pos(
+...         0, 0, 0
+...     ),
+...     end_pos=Pos(
+...         3, 2, 2
+...     ),
 ...     start_xz_dir="south",
 ...     end_xz_dir="east",
 ...     instance_points=set(),
@@ -59,7 +70,9 @@ RedstoneBussing(element_sig_strengths=frozendict.frozendict({Pos(0, 0, 0): 15, .
 >>> print(costs)
 [1, 1, 4, 1, 1]
 
->>> schem = bussing.schem()
+>>> schem = (
+...     bussing.schem()
+... )
 >>> pprint(schem)
 Schematic(pos_blocks={Pos(0, -1, 0): Block(block_type='minecraft:..._wool',
                                            attributes=frozendict.frozendict({})),
@@ -73,8 +86,12 @@ Schematic(pos_blocks={Pos(0, -1, 0): Block(block_type='minecraft:..._wool',
           pos_sign_lines={})
 
 The minimal bus has a traverse element, and an ascend element:
->>> from redhdl.voxel.region import display_regions
->>> display_regions(schem.pos_blocks.mask())  # doctest: +NORMALIZE_WHITESPACE
+>>> from redhdl.voxel.region import (
+...     display_regions,
+... )
+>>> display_regions(
+...     schem.pos_blocks.mask()
+... )  # doctest: +NORMALIZE_WHITESPACE
 Y  [(0, 2)]
    1
   11
@@ -118,6 +135,7 @@ Y  [(0, 3)]
 ...     # save_schem(schem, f"/tmp/test_bus_{i].schematic")
 ...     # display_regions(schem.pos_blocks.mask())
 """
+
 from dataclasses import dataclass, field, replace
 from functools import cached_property, reduce
 from logging import getLogger
@@ -458,7 +476,8 @@ class RedstoneBussing:
             facing=self.repeater_directions.get(pos),
         )
 
-    def add_step(
+    # TODO: See if this can be broken apart.
+    def add_step(  # noqa: C901
         self,
         other_buses: "RedstoneBussing",
         instance_points: set[Pos],
@@ -623,14 +642,14 @@ class RedstoneBussing:
             ):
                 new_spacer_blocks.add(step.next_pos + direction_unit_pos["up"])
 
-            new_spacer_blocks |= set(
+            new_spacer_blocks |= {
                 neighbor_block
                 for neighbor_block in xz_neighbor_blocks
                 if (
                     (neighbor_block + direction_unit_pos["down"])
                     in other_buses.wire_blocks
                 )
-            )
+            }
 
         spacer_blocks = self.spacer_blocks | frozenset(new_spacer_blocks)
 
@@ -677,7 +696,7 @@ class RedstoneBussing:
             element_sig_strengths=frozendict(
                 (pos, sig_strength)
                 for pos, sig_strength in self.element_sig_strengths.items()
-                if pos == current_pos or pos == previous_pos
+                if pos == current_pos or pos == previous_pos  # pylint: disable=SIM109
             ),
             repeater_directions=frozendict(
                 (pos, dir)
@@ -868,7 +887,11 @@ def _min_xz_turns(
         - Else they don't point the same way:
             - If the starting position points directly away from the finish, that'll take a turn to correct. Plus one turn.
             - If the finishing position points directly away from the start, that'll take a turn to correct. Plus one turn.
-    >>> _min_xz_turns(Pos(5, 5, 5), start_xz_momentum=None, end_xz_momentum=None)
+    >>> _min_xz_turns(
+    ...     Pos(5, 5, 5),
+    ...     start_xz_momentum=None,
+    ...     end_xz_momentum=None,
+    ... )
     1
     """
 
@@ -1141,11 +1164,11 @@ def redstone_bussing(
     try:
         steps = a_star_bfs_searched_solution(problem, max_steps=max_steps)
     except SearchTimeoutError as e:
-        raise BussingTimeoutError(f"Failed to find A* bus route: {e}")
+        raise BussingTimeoutError(f"Failed to find A* bus route: {e}") from None
     except NoSolutionError:
         raise BussingImpossibleError(
             f"No way to bus between {start_pos} and {end_pos}."
-        )
+        ) from None
 
     problem = replace(problem, history_limit=None)
 

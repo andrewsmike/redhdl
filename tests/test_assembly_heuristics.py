@@ -1,11 +1,12 @@
-from frozendict import frozendict
 from pprint import pprint
+
+from frozendict import frozendict
 from pytest import mark
 
 from redhdl.assembly.assembly import (
-    unbussable_placement_heuristic_costs,
     _unbussable_placement_heuristic_weights,
     _weighted_costs,
+    unbussable_placement_heuristic_costs,
 )
 from redhdl.assembly.placement import display_placement
 from redhdl.netlist.netlist_template import (
@@ -50,18 +51,22 @@ Z  [(28, 43)]
 """
 
 example_placements = {
-    "vert_horiz_misaligned": frozendict({
-        "and": (Pos(8, 0, 2), 'east'),
-        "not_a": (Pos(2, 4, 0), 'east'),
-        "not_b": (Pos(0, 0, 2), 'east'),
-        "not_out": (Pos(12, 4, 1), 'east')
-    }),
-    "vert_misaligned": frozendict({
-        "and": (Pos(8, 0, 0), 'east'),
-        "not_a": (Pos(2, 4, 0), 'east'),
-        "not_b": (Pos(0, 0, 0), 'east'),
-        "not_out": (Pos(12, 4, 0), 'east')
-    }),
+    "vert_horiz_misaligned": frozendict(
+        {
+            "and": (Pos(8, 0, 2), "east"),
+            "not_a": (Pos(2, 4, 0), "east"),
+            "not_b": (Pos(0, 0, 2), "east"),
+            "not_out": (Pos(12, 4, 1), "east"),
+        }
+    ),
+    "vert_misaligned": frozendict(
+        {
+            "and": (Pos(8, 0, 0), "east"),
+            "not_a": (Pos(2, 4, 0), "east"),
+            "not_b": (Pos(0, 0, 0), "east"),
+            "not_out": (Pos(12, 4, 0), "east"),
+        }
+    ),
 }
 
 expected_heuristic_costs = {
@@ -91,9 +96,9 @@ expected_heuristic_costs = {
     },
 }
 
+
 @mark.parametrize("placement_name,placement", sorted(example_placements.items()))
 def test_unbussable_heuristics(placement_name, placement):
-
     netlist = netlist_from_simple_spec(
         instance_config=example_instance_configs,
         network_specs=example_network_specs,
@@ -111,9 +116,11 @@ def test_unbussable_heuristics(placement_name, placement):
     print()
 
     print(f"[{placement_name}] Weighted costs:")
-    pprint(_weighted_costs(
-        heuristic_costs,
-        _unbussable_placement_heuristic_weights,
-    ))
+    pprint(
+        _weighted_costs(
+            heuristic_costs,
+            _unbussable_placement_heuristic_weights,
+        )
+    )
 
     assert expected_heuristic_costs[placement_name] == heuristic_costs

@@ -8,62 +8,179 @@ Region types:
 - Potential future add: Diagonal polyhedra for diagonal circuits.
 
 Example usages:
->>> from redhdl.voxel.region import CompositeRegion, RectangularPrism
+>>> from redhdl.voxel.region import (
+...     CompositeRegion,
+...     RectangularPrism,
+... )
 
->>> example = RectangularPrism(Pos(0, 0, 0), Pos(2, 3, 4))
->>> continuing_with_overlap = RectangularPrism(Pos(2, 3, 4), Pos(3, 4, 5))
+>>> example = RectangularPrism(
+...     Pos(0, 0, 0),
+...     Pos(2, 3, 4),
+... )
+>>> continuing_with_overlap = RectangularPrism(
+...     Pos(2, 3, 4),
+...     Pos(3, 4, 5),
+... )
 
 >>> example & continuing_with_overlap
 RectangularPrism(Pos(2, 3, 4), Pos(2, 3, 4))
 
->>> example.intersects(continuing_with_overlap)
+>>> example.intersects(
+...     continuing_with_overlap
+... )
 True
 
->>> just_beyond = RectangularPrism(Pos(3, 4, 5), Pos(8, 8, 8))
+>>> just_beyond = RectangularPrism(
+...     Pos(3, 4, 5),
+...     Pos(8, 8, 8),
+... )
 
->>> example.intersects(just_beyond)
+>>> example.intersects(
+...     just_beyond
+... )
 False
->>> just_beyond.intersects(continuing_with_overlap)
+>>> just_beyond.intersects(
+...     continuing_with_overlap
+... )
 True
 
->>> example.intersects(RectangularPrism(Pos(-2, -2, -2), Pos(-1, -1, -1)))
+>>> example.intersects(
+...     RectangularPrism(
+...         Pos(
+...             -2,
+...             -2,
+...             -2,
+...         ),
+...         Pos(
+...             -1,
+...             -1,
+...             -1,
+...         ),
+...     )
+... )
 False
->>> example.intersects(RectangularPrism(Pos(-1, -1, -1), Pos(8, 8, 8)))
+>>> example.intersects(
+...     RectangularPrism(
+...         Pos(
+...             -1,
+...             -1,
+...             -1,
+...         ),
+...         Pos(
+...             8, 8, 8
+...         ),
+...     )
+... )
 True
 
 
->>> composite_w_big_boi = CompositeRegion(subregions=(
-...     RectangularPrism(Pos(0, 0, 0), Pos(2, 3, 4)),
-...     RectangularPrism(Pos(-1, -1, -1), Pos(8, 8, 8)),
-... ))
+>>> composite_w_big_boi = CompositeRegion(
+...     subregions=(
+...         RectangularPrism(
+...             Pos(
+...                 0,
+...                 0,
+...                 0,
+...             ),
+...             Pos(
+...                 2,
+...                 3,
+...                 4,
+...             ),
+...         ),
+...         RectangularPrism(
+...             Pos(
+...                 -1,
+...                 -1,
+...                 -1,
+...             ),
+...             Pos(
+...                 8,
+...                 8,
+...                 8,
+...             ),
+...         ),
+...     )
+... )
 
->>> composite_just_beyond = CompositeRegion(subregions=(
-...     RectangularPrism(Pos(3, 4, 5), Pos(8, 8, 8)),
-...     RectangularPrism(Pos(-2, -2, -2), Pos(-1, -1, -1)),
-... ))
+>>> composite_just_beyond = CompositeRegion(
+...     subregions=(
+...         RectangularPrism(
+...             Pos(
+...                 3,
+...                 4,
+...                 5,
+...             ),
+...             Pos(
+...                 8,
+...                 8,
+...                 8,
+...             ),
+...         ),
+...         RectangularPrism(
+...             Pos(
+...                 -2,
+...                 -2,
+...                 -2,
+...             ),
+...             Pos(
+...                 -1,
+...                 -1,
+...                 -1,
+...             ),
+...         ),
+...     )
+... )
 
->>> pprint(composite_w_big_boi & composite_just_beyond)
+>>> pprint(
+...     composite_w_big_boi
+...     & composite_just_beyond
+... )
 CompositeRegion(subregions=(RectangularPrism(Pos(3, 4, 5), Pos(8, 8, 8)),
                             RectangularPrism(Pos(-1, -1, -1), Pos(-1, -1, -1))))
 
->>> composite_example = CompositeRegion((RectangularPrism(Pos(0, 0, 0), Pos(2, 3, 4)),))
->>> composite_example.intersects(just_beyond)
+>>> composite_example = CompositeRegion(
+...     (
+...         RectangularPrism(
+...             Pos(
+...                 0,
+...                 0,
+...                 0,
+...             ),
+...             Pos(
+...                 2,
+...                 3,
+...                 4,
+...             ),
+...         ),
+...     )
+... )
+>>> composite_example.intersects(
+...     just_beyond
+... )
 False
->>> example.intersects(composite_just_beyond)
+>>> example.intersects(
+...     composite_just_beyond
+... )
 False
->>> composite_w_big_boi.intersects(composite_just_beyond)
+>>> composite_w_big_boi.intersects(
+...     composite_just_beyond
+... )
 True
->>> composite_w_big_boi.intersects(just_beyond)
+>>> composite_w_big_boi.intersects(
+...     just_beyond
+... )
 True
 """
+
 from abc import ABCMeta, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import cache, cached_property
 from pprint import pformat
 from random import randint
 from typing import (
     Any,
-    Iterator,
     Literal,
     NamedTuple,
     TypeGuard,
@@ -124,7 +241,7 @@ opposite_direction: dict[Direction, Direction] = {
 
 
 def xz_direction_y_rotated(direction: Direction, quarter_turns: int = 1) -> Direction:
-    for i in range(quarter_turns):
+    for _quarter_turn_index in range(quarter_turns):
         direction = cast(
             Direction,
             {
@@ -441,7 +558,7 @@ class PositionSequence:
         step = self.step
 
         curr_pos = self.start
-        for i in range(self.count):
+        for _step_index in range(self.count):
             yield curr_pos
             curr_pos += step
 
@@ -486,8 +603,8 @@ class Region(metaclass=ABCMeta):
     def __iter__(self) -> Iterator[Pos]:
         pass
 
-    @cache
-    def region_points(self) -> frozenset[Pos]:
+    @cached_property
+    def points(self) -> frozenset[Pos]:
         return frozenset(self)
 
     def __contains__(self, point: Pos) -> bool:
@@ -564,7 +681,6 @@ class PointRegion(Region):
         return point in self.points
 
     def __and__(self, other: Region) -> Any:
-
         # Fast AABB check.
         if not (self.min_pos <= other.max_pos and self.max_pos >= other.min_pos):
             return PointRegion(frozenset())
@@ -598,11 +714,8 @@ class PointRegion(Region):
     def __ror__(self, other: Region) -> Any:
         return self.__or__(other)
 
-    # Not caching this, which throws off mypy.
-    def region_points(self) -> frozenset[Pos]:  # type: ignore
-        return self.points
-
-    @cache
+    # TODO: Replace memory leaking @cache with id()-based caching.
+    @cache  # noqa: B019
     def intersects(self, other: "Region") -> bool:
         # Fast AABB check.
         if not (self.min_pos <= other.max_pos and self.max_pos >= other.min_pos):
@@ -711,7 +824,8 @@ class RectangularPrism(Region):
     def is_empty(self) -> bool:
         return not (self.min_pos <= self.max_pos)
 
-    @cache
+    # TODO: Replace memory leaking @cache with id()-based caching.
+    @cache  # noqa: B019
     def intersects(self, other: "Region") -> bool:
         # Fast AABB check.
         if not (self.min_pos <= other.max_pos and self.max_pos >= other.min_pos):
@@ -765,7 +879,8 @@ class CompositeRegion(Region):
             )
         )
 
-    @cache
+    # TODO: Replace memory leaking @cache with id()-based caching.
+    @cache  # noqa: B019
     def __len__(self) -> int:
         """
         The area taken by a set of overlapping regions is a hard problem.
@@ -773,7 +888,7 @@ class CompositeRegion(Region):
         This method will not scale gracefully to large numbers of subregions.
         """
         block_count = 0
-        counted_regions = CompositeRegion(tuple())
+        counted_regions = CompositeRegion(tuple())  # noqa: C408
         for subregion in self.subregions:
             # Invariant: len(counted_region.subregions) < len(self.subregions)
             # Base case: len(self.subregions) == 0, return 0.
@@ -829,11 +944,12 @@ class CompositeRegion(Region):
     def is_empty(self) -> bool:
         return all(region.is_empty() for region in self.subregions)
 
-    @cache
-    def region_points(self) -> frozenset[Pos]:
-        return frozenset.union(*(region.region_points() for region in self.subregions))
+    @cached_property
+    def points(self) -> frozenset[Pos]:
+        return frozenset.union(*(region.points for region in self.subregions))
 
-    @cache
+    # TODO: Replace memory leaking @cache with id()-based caching.
+    @cache  # noqa: B019
     def intersects(self, other: "Region") -> bool:
         # Fast AABB check.
         if not (self.min_pos <= other.max_pos and self.max_pos >= other.min_pos):
@@ -930,15 +1046,13 @@ AxisData = TypeVar("AxisData")
 @overload
 def partial_coord(
     values: tuple[AxisData, AxisData], axis_index: int
-) -> tuple[AxisData]:
-    ...
+) -> tuple[AxisData]: ...
 
 
 @overload
 def partial_coord(
     values: tuple[AxisData, AxisData, AxisData], axis_index: int
-) -> tuple[AxisData, AxisData]:
-    ...
+) -> tuple[AxisData, AxisData]: ...
 
 
 def partial_coord(values, axis_index):
@@ -957,6 +1071,8 @@ def partial_coord(values, axis_index):
         ][axis_index]
 
 
+# TODO: Consider rewriting to simplify
+# pylint: disable-next=C901
 def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
     """
     "Compactly" display a list of regions in ASCII using an axis-aligned

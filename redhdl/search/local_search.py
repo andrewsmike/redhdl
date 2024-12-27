@@ -4,6 +4,7 @@ Local search: Use black-box optimization methods to solve problems.
 Can be contrasted with tree-based search methods, which are complete / not probabilistic.
 Currently used to identify placements.
 """
+
 from abc import ABCMeta, abstractmethod
 from math import exp
 from random import random
@@ -31,7 +32,9 @@ class LocalSearchProblem(Generic[Solution], metaclass=ABCMeta):
         return False
 
 
-def sim_annealing_searched_solution(
+# This is reasonably close to its min complexity, but it's a bit above the complexity
+# threshold. I'm not certain breaking into helpers will add clarity, so leaving as is.
+def sim_annealing_searched_solution(  # noqa: C901
     problem: LocalSearchProblem[Solution],
     total_rounds: int = 2_000,
     restarts: int = 1,
@@ -74,11 +77,12 @@ def sim_annealing_searched_solution(
         if rounds_per_print is not None and i % rounds_per_print == 0:
             print(f"\nBest cost: {best_cost}, last cost: {current_cost}")
 
-        if (
+        should_checkpoint = (
             rounds_per_checkpoint is not None
             and i % rounds_per_checkpoint == 0
             and i > 0
-        ):
+        )
+        if should_checkpoint:
             assert best_cost is not None and best_solution is not None  # For MyPy.
             assert checkpoint_func is not None  # For MyPy.
             checkpoint_func(i, best_solution, best_cost)

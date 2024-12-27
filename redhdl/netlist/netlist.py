@@ -85,11 +85,13 @@ Netlist(instances={'adder': ExampleInstanceType(...),
               | output |
               +--------+
 """
+
+from collections.abc import Iterable
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import wraps
 from itertools import groupby
-from typing import Any, Iterable, Literal, Optional
+from typing import Any, Literal, Optional
 
 from frozendict import frozendict
 
@@ -424,7 +426,7 @@ class Netlist:
     ) -> Iterable[tuple[PinIdSequence, PinIdSequence]]:
         """All non-I/O PinIdSequence -> PinIdSequence pairs."""
 
-        for network_id, network in self.networks.items():
+        for _network_id, network in self.networks.items():
             instance_id, port_name = network.input_pin_id_seq.port_id
             if instance_id == "input":
                 continue

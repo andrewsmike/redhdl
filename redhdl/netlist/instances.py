@@ -1,8 +1,8 @@
 """Concrete Netlist Instance (with Ports) with a backing Schematic."""
 
 from abc import ABCMeta, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
-from typing import Mapping
 
 from redhdl.netlist.netlist import Instance, PortName, PortType
 from redhdl.voxel.region import (
@@ -27,12 +27,10 @@ class PortInterface(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def y_rotated(self, quarter_turns: int = 1) -> "PortInterface":
-        ...
+    def y_rotated(self, quarter_turns: int = 1) -> "PortInterface": ...
 
     @abstractmethod
-    def wire_offset(self, port_type: PortType) -> Pos:
-        ...
+    def wire_offset(self, port_type: PortType) -> Pos: ...
 
 
 @dataclass

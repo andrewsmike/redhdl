@@ -283,7 +283,7 @@ def save_schem(schematic: Schematic, dest_path: str):
         block: index
         for index, block in enumerate(
             sorted(
-                {block for block in blocks.values()} | {air_block},
+                set(blocks.values()) | {air_block},
                 key=lambda block: (block.block_type, set(block.attributes.items())),
             )
         )
@@ -414,12 +414,18 @@ def display_schematic(schem: Schematic, desc: Optional[str] = None) -> None:
 
 @cache
 def _interactive_schem_desc_paths(prefix: str) -> tuple[str, str]:
-    schem_file = NamedTemporaryFile(prefix=f"{prefix}_", suffix=".schem")
-    desc_file = NamedTemporaryFile(prefix=f"{prefix}_", suffix=".txt")
+    schem_file = NamedTemporaryFile(prefix=f"{prefix}_", suffix=".schem")  # noqa: SIM115
+    desc_file = NamedTemporaryFile(prefix=f"{prefix}_", suffix=".txt")  # noqa: SIM115
     display_proc = Popen(
         ["scripts/display_schem.py", schem_file.name, desc_file.name],
     )
-    atexit.register(lambda: display_proc.kill())
+
+    @atexit.register
+    def cleanup_interactive_viewer():
+        display_proc.kill()
+        schem_file.close()
+        desc_file.close()
+
     return schem_file.name, desc_file.name
 
 

@@ -165,7 +165,7 @@ class HeuristicBussingPlacementProblem(LocalSearchProblem[InstancePlacement]):
         return self.initial_placement
 
     def mutated_solution(self, solution: InstancePlacement) -> InstancePlacement:
-        for i in range(self.mutations_per_step):
+        for _attempt_index in range(self.mutations_per_step):
             solution = mutated_placement(solution)
 
         return solution
@@ -189,7 +189,7 @@ def mutated_unbussable_placement(
     )
     if next_placement == placement:  # Sim annealing didn't like the results.
         print("No improvement.")
-        for i in range(3):
+        for _attempt_index in range(3):
             placement = mutated_placement(placement)
 
         return placement
@@ -251,7 +251,6 @@ class BussingPlacementProblem(LocalSearchProblem[InstancePlacement]):
             return False
 
     def solution_cost(self, solution: InstancePlacement) -> float:
-
         print("Placement:")
         pprint(dict(solution))
 

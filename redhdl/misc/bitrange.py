@@ -3,6 +3,7 @@ Bitrange: Handling (inclusive) sets of (start_index, end_index) integer ranges.
 
 Largely used to handle vHDL bitarray index slice logic.
 """
+
 from redhdl.misc.slice import Slice
 from redhdl.netlist.netlist import Port  # To support Port pin_count => BitRange.
 

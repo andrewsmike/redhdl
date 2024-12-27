@@ -1,7 +1,8 @@
 from time import time
 
 from redhdl.bussing.errors import BussingTimeoutError
-from redhdl.bussing.redstone_bussing import *
+from redhdl.bussing.redstone_bussing import RedstoneBussing, redstone_bussing_details
+from redhdl.voxel.region import Pos
 
 
 def test_search_durations():
@@ -19,15 +20,17 @@ def test_search_durations():
     start_time = time()
     for distance in [5, 10, 30, 70]:
         try:
-            bussing, problem, states, steps, costs, algo_steps = redstone_bussing_details(
-                start_pos=Pos(0, 0, 0),
-                # end_pos=Pos(3, 2, 2),
-                end_pos=Pos(distance, distance, distance),
-                start_xz_dir="south",
-                end_xz_dir="east",
-                instance_points=set(),
-                other_buses=RedstoneBussing(),
-                max_steps=5_000,
+            bussing, problem, states, steps, costs, algo_steps = (
+                redstone_bussing_details(
+                    start_pos=Pos(0, 0, 0),
+                    # end_pos=Pos(3, 2, 2),
+                    end_pos=Pos(distance, distance, distance),
+                    start_xz_dir="south",
+                    end_xz_dir="east",
+                    instance_points=set(),
+                    other_buses=RedstoneBussing(),
+                    max_steps=5_000,
+                )
             )
             expanding_steps = [
                 step for step in algo_steps if step.algo_action == "expanding_step"

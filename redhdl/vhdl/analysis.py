@@ -79,6 +79,7 @@ dict_keys([None])
 >>> print(str_from_parse_tree(var_assignments["C"][None].expr))
 tmp_ivl_15 and tmp_ivl_24
 """
+
 from typing import Any, cast
 
 from redhdl.misc.bitrange import BitRange, bitrange_width
@@ -770,10 +771,10 @@ def identifier_list_strs(identifier_list_node: ParseTree) -> list[str]:
     >>> identifier_list_strs(parsed("a, b", "identifier_list"))
     ['a', 'b']
     """
-    return list(
+    return [
         parse_tree_assert_get_text(identifier_node, 0)
         for identifier_node in children_of_type(identifier_list_node, "identifier")
-    )
+    ]
 
 
 @parse_tree_query
@@ -913,7 +914,6 @@ def architecture_var_assignments(
 
 @called_on_node_type("waveform")
 def waveform_expr(waveform_node: ParseTree) -> Expression:
-
     waveform_elements = children_of_type(waveform_node, "waveform_element")
     if len(waveform_elements) > 1:
         raise ValueError("Cannot handle comma-separated waveform expressions.")

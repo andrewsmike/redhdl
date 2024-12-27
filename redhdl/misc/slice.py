@@ -1,5 +1,6 @@
 """slice(), but hashable."""
-from typing import Iterator
+
+from collections.abc import Iterator
 
 
 class Slice:

@@ -110,7 +110,13 @@ ignore = [
     "E266",
     "E501",
     "F841",
-    "SIM118",  # Being explicit when iterating over dict.keys() honestly seems clearer to me
+    # if/else blocks are useful for separating the context for handling different scenarios.
+    # Cramming everything into a ternary operator neither adds clarity nor simplifies anything.
+    # Having seen many of the "corrected" examples, I feel rather strongly about this.
+    "SIM108",
+    # Being explicit when iterating over dict.keys() honestly seems clearer to me, though
+    # not a hill I'm willing to die on.
+    "SIM118",
 ]
 
 [tool.ruff.format]

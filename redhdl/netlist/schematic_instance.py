@@ -80,8 +80,9 @@ SchematicInstance(ports={'in': Port(port_type='in', pin_count=8),
                                   'out': PortPlacement(positions=PositionSequence(Pos(0, 0, 3), Pos(14, 0, 3), count=8),
                                                        port_interface=RepeaterPortInterface(facing='south'))})
 """
+
 from re import match
-from typing import Dict, cast
+from typing import cast
 
 from redhdl.netlist.instances import (
     PortPlacement,
@@ -133,7 +134,7 @@ def port_type_name_index(sign_text: str) -> tuple[PortType, str, int]:
     else:
         index = 0
 
-    port_type_from_name: Dict[str, PortType] = {
+    port_type_from_name: dict[str, PortType] = {
         "input": "in",
         "output": "out",
     }
@@ -169,7 +170,7 @@ def schematic_instance_from_schem(schem: Schematic) -> SchematicInstance:
         and (lines[0].startswith("input") or lines[0].startswith("output"))
     }
 
-    port_type: Dict[str, PortType] = {}
+    port_type: dict[str, PortType] = {}
     port_indices: dict[str, set[int]] = {}
     port_index_position = {}
     for pos, (port_io_type, port_name, pin_index) in pos_port_type_name_index.items():

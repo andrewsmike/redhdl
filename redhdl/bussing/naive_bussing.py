@@ -30,7 +30,6 @@ def dest_pin_buses(
     max_bussing_steps: int = 50,
 ) -> PinBuses:
     instances_region = placement_region(netlist, placement).xz_padded(1)
-    instance_region_points = instances_region.region_points()
 
     dest_pin_buses: PinBuses = {}
     for pin_pos_pair in source_dest_pin_pos_pairs(netlist, placement):
@@ -40,7 +39,7 @@ def dest_pin_buses(
             end_pos=pin_pos_pair.dest_pin_pos,
             start_xz_dir=pin_pos_pair.source_pin_facing,
             end_xz_dir=pin_pos_pair.dest_pin_facing,
-            instance_points=instance_region_points,
+            instance_points=instances_region.points,
             other_buses=other_buses,
             max_steps=max_bussing_steps,
         )

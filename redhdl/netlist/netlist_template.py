@@ -66,6 +66,7 @@ Netlist(instances={'and': SchematicInstance(...),
             | output |
             +--------+
 """
+
 from typing import cast
 
 from redhdl.misc.slice import Slice
@@ -130,7 +131,7 @@ def netlist_from_simple_spec(
     }
 
     network_specs: dict[tuple[PortId, Slice], set[tuple[PortId, Slice]]] = {}
-    for ((dest_port, dest_seq), (src_port, src_seq)) in port_slice_assignments.items():
+    for (dest_port, dest_seq), (src_port, src_seq) in port_slice_assignments.items():
         network_specs.setdefault((src_port, src_seq), set()).add((dest_port, dest_seq))
 
     networks = {

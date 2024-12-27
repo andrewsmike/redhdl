@@ -3,6 +3,7 @@ Simpler, partial representation of vHDL files for generating netlists.
 
 See analysis.py for a more thorough docstring.
 """
+
 from dataclasses import dataclass
 from pprint import pformat
 from typing import NewType, cast
@@ -160,7 +161,6 @@ def subinstances_with_resolved_port_bitranges(
     subinstances: dict[VHDLInstanceName, ArchitectureSubinstance],
     arch_ports: dict[VHDLArchitectureName, dict[VHDLPortName, Port]],
 ) -> dict[VHDLInstanceName, ArchitectureSubinstance]:
-
     undeclared_ports = {
         port_name
         for subinst in subinstances.values()
