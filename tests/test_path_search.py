@@ -7,6 +7,7 @@ from redhdl.search.path_search import (
     Action,
     PathSearchProblem,
     State,
+    Step,
     TracedPathSearchProblem,
     a_star_bfs_searched_solution,
     a_star_iddfs_searched_solution,
@@ -77,11 +78,12 @@ class PlanarPathSearchProblem(PathSearchProblem[Pos, Direction]):
 
         return "\n".join(lines)
 
-    def solution_valid(self, solution: list[Action]) -> bool:
+    def solution_valid(self, solution: list[Direction]) -> bool:
         current_pos = self.start_pos
         for step_direction in solution:
             if current_pos in self.wall_poses:
                 return False
+
             current_pos += direction_unit_pos[step_direction]
 
         return current_pos == self.end_pos
@@ -89,7 +91,7 @@ class PlanarPathSearchProblem(PathSearchProblem[Pos, Direction]):
 
 problem_map = (
     "         e"
-    + +"          "
+    + "          "
     + "########  "
     + "       #  "
     + "       #  "
@@ -161,7 +163,7 @@ def test_iddfs_efficiency():
 
 
 def steps_2d_map_str(steps: list[Pos]) -> str:
-    pos_indices = {}
+    pos_indices: dict[Pos, int] = {}
     for step in steps:
         if step not in pos_indices:
             pos_indices[step] = len(pos_indices)
@@ -186,8 +188,8 @@ def fully_order_steps():
     This is useful for reproducible testing.
     """
 
-    def cmp_key(step) -> tuple[float, float, State, Action]:
-        return (step.min_cost, -step.cost, tuple(step.state), step.action)
+    def cmp_key(step: Step[State, Action]) -> tuple[float, float, State, Action]:
+        return (step.min_cost, -step.cost, step.state, step.action)
 
     with ExitStack() as stack:
         for patch_func_name, patch_func in [
@@ -198,7 +200,10 @@ def fully_order_steps():
             ("__ge__", lambda self, other: cmp_key(self) >= cmp_key(other)),
         ]:
             stack.enter_context(
-                patch(f"redhdl.search.path_search.Step.{patch_func_name}", patch_func)
+                patch(
+                    f"redhdl.search.path_search.AlgoTraceStep.{patch_func_name}",
+                    patch_func,
+                )
             )
 
         yield
@@ -300,26 +305,28 @@ def display_iddfs_expansion_order():
 
 
 @dataclass(frozen=True)
-class BinarySearchProblem(PathSearchProblem[tuple[int], int]):
+class BinarySearchProblem(PathSearchProblem[tuple[int, ...], int]):
     hard_hint: bool
-    solution: tuple[int]
+    solution: tuple[int, ...]
 
-    def initial_state(self) -> tuple[int]:
+    def initial_state(self) -> tuple[int, ...]:
         return ()
 
-    def state_actions(self, state: tuple[int]) -> list[int]:
+    def state_actions(self, state: tuple[int, ...]) -> list[int]:
         return [0, 1, 2, 3]
 
-    def state_action_result(self, state: tuple[int], action: int) -> tuple[int]:
+    def state_action_result(
+        self, state: tuple[int, ...], action: int
+    ) -> tuple[int, ...]:
         return state + (action,)
 
-    def state_action_cost(self, state: tuple[int], action: int) -> float:
+    def state_action_cost(self, state: tuple[int, ...], action: int) -> float:
         return 1 if action > 0 else 1.25
 
-    def is_goal_state(self, state: tuple[int]) -> bool:
+    def is_goal_state(self, state: tuple[int, ...]) -> bool:
         return state == self.solution
 
-    def min_cost(self, state: tuple[int]) -> float:
+    def min_cost(self, state: tuple[int, ...]) -> float:
         INF = 1000000000
         if len(state) > len(self.solution):
             return INF

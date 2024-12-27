@@ -13,13 +13,13 @@ from redhdl.search.path_search import Step
 from redhdl.voxel.region import Pos
 
 _DISTANCE = 20
-seen_step_min_costs = {}
+seen_step_min_costs: dict[Pos, float] = {}
 
 
 def display_step(step: Step, problem, x_range, y_range):  # noqa: C901
     min_x, max_x = x_range
     min_y, max_y = y_range
-    curr_step = step
+    curr_step: Step | None = step
 
     pos_prev_pos = {}
     bus_pos_costs_min_costs = {}

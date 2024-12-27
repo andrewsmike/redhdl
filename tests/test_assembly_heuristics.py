@@ -11,7 +11,7 @@ from redhdl.assembly.assembly import (
 from redhdl.assembly.placement import display_placement
 from redhdl.netlist.netlist_template import (
     example_instance_configs,
-    example_network_specs,
+    example_port_slice_assignments,
     netlist_from_simple_spec,
 )
 from redhdl.voxel.region import Pos
@@ -101,7 +101,7 @@ expected_heuristic_costs = {
 def test_unbussable_heuristics(placement_name, placement):
     netlist = netlist_from_simple_spec(
         instance_config=example_instance_configs,
-        network_specs=example_network_specs,
+        port_slice_assignments=example_port_slice_assignments,
         output_port_bitwidths={"out": 8},
     )
 

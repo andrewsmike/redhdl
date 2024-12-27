@@ -18,7 +18,7 @@ from redhdl.bussing.redstone_bussing import (
 )
 from redhdl.netlist.netlist_template import (
     example_instance_configs,
-    example_network_specs,
+    example_port_slice_assignments,
     netlist_from_simple_spec,
 )
 from redhdl.voxel.region import PointRegion, Pos, display_regions
@@ -28,7 +28,7 @@ from redhdl.voxel.schematic import save_schem
 def main():
     netlist = netlist_from_simple_spec(
         instance_config=example_instance_configs,
-        network_specs=example_network_specs,
+        example_port_slice_assignments=example_port_slice_assignments,
         output_port_bitwidths={"out": 8},
     )
 
