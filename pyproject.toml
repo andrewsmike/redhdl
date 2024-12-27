@@ -62,9 +62,29 @@ skip = [
 ]
 
 [tool.mypy]
-files = "redhdl"
 ignore_missing_imports = true
-exclude = "ascii_dag.py|vhdl(Lexer|Parser|Listener|ParserVisitor|Visitor|ParserListener).py"
+exclude = [
+    "redhdl/misc/ascii_dag.py",
+    "vhdlLexer.py",
+    "vhdlListener.py",
+    "vhdlParser.py",
+    "vhdlParserListener.py",
+    "vhdlParserVisitor.py",
+    "vhdlVisitor.py",
+    "autogen",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "redhdl.vhdl.vhdlParser",
+    "redhdl.vhdl.vhdlLexer",
+    "redhdl.vhdl.vhdlListener",
+    "redhdl.vhdl.vhdlVisitor",
+    "redhdl.vhdl.autogen",
+]
+follow_imports = "skip"
+
+
 
 [tool.pytest.ini_options]
 addopts = "--doctest-modules --ignore=redhdl/vhdl/autogen --ignore=redhdl/vhdl/vhdlLexer.py --ignore=redhdl/vhdl/vhdlParser.py --ignore=redhdl/vhdl/vhdlParserVisitor.py"
