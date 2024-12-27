@@ -157,13 +157,17 @@ def parse_tree_query(func):
     of your children, along with your arguments.
     ie:
     >>> @parse_tree_query
-    ... def my_query(parse_tree: ParseTree, children_values: list[Any], my_arg_1, my_arg_2: bool = False) -> Any:
+    ... def my_query(
+    ...     parse_tree: ParseTree, children_values: list[Any], my_arg_1, my_arg_2: bool = False
+    ... ) -> Any:
     ...     for child_value in children_values:
     ...         if child_value is not None:
-    ...            return child_value
+    ...             return child_value
 
     >>> @my_query.register("ruleOfInterest")
-    ... def my_query_rule_of_interest(parse_tree: ParseTree, children_values: list[Any], my_arg_1, my_arg_2: bool = False) -> Any:
+    ... def my_query_rule_of_interest(
+    ...     parse_tree: ParseTree, children_values: list[Any], my_arg_1, my_arg_2: bool = False
+    ... ) -> Any:
     ...     return parse_tree.text
     """
 

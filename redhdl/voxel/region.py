@@ -25,9 +25,7 @@ Example usages:
 >>> example & continuing_with_overlap
 RectangularPrism(Pos(2, 3, 4), Pos(2, 3, 4))
 
->>> example.intersects(
-...     continuing_with_overlap
-... )
+>>> example.intersects(continuing_with_overlap)
 True
 
 >>> just_beyond = RectangularPrism(
@@ -35,13 +33,9 @@ True
 ...     Pos(8, 8, 8),
 ... )
 
->>> example.intersects(
-...     just_beyond
-... )
+>>> example.intersects(just_beyond)
 False
->>> just_beyond.intersects(
-...     continuing_with_overlap
-... )
+>>> just_beyond.intersects(continuing_with_overlap)
 True
 
 >>> example.intersects(
@@ -66,9 +60,7 @@ False
 ...             -1,
 ...             -1,
 ...         ),
-...         Pos(
-...             8, 8, 8
-...         ),
+...         Pos(8, 8, 8),
 ...     )
 ... )
 True
@@ -132,10 +124,7 @@ True
 ...     )
 ... )
 
->>> pprint(
-...     composite_w_big_boi
-...     & composite_just_beyond
-... )
+>>> pprint(composite_w_big_boi & composite_just_beyond)
 CompositeRegion(subregions=(RectangularPrism(Pos(3, 4, 5), Pos(8, 8, 8)),
                             RectangularPrism(Pos(-1, -1, -1), Pos(-1, -1, -1))))
 
@@ -155,21 +144,13 @@ CompositeRegion(subregions=(RectangularPrism(Pos(3, 4, 5), Pos(8, 8, 8)),
 ...         ),
 ...     )
 ... )
->>> composite_example.intersects(
-...     just_beyond
-... )
+>>> composite_example.intersects(just_beyond)
 False
->>> example.intersects(
-...     composite_just_beyond
-... )
+>>> example.intersects(composite_just_beyond)
 False
->>> composite_w_big_boi.intersects(
-...     composite_just_beyond
-... )
+>>> composite_w_big_boi.intersects(composite_just_beyond)
 True
->>> composite_w_big_boi.intersects(
-...     just_beyond
-... )
+>>> composite_w_big_boi.intersects(just_beyond)
 True
 """
 
@@ -963,24 +944,32 @@ class CompositeRegion(Region):
 
 def any_overlap(regions: list[Region]) -> bool:
     """
-    >>> any_overlap([
-    ...     CompositeRegion((
-    ...         RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
-    ...         RectangularPrism(Pos(10, 0, 0), Pos(10, 0, 0)),
-    ...         RectangularPrism(Pos(0, 0, 10), Pos(5, 5, 15)),
-    ...     )),
-    ...     RectangularPrism(Pos(0, 10, 0), Pos(5, 15, 5)),
-    ... ])
+    >>> any_overlap(
+    ...     [
+    ...         CompositeRegion(
+    ...             (
+    ...                 RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
+    ...                 RectangularPrism(Pos(10, 0, 0), Pos(10, 0, 0)),
+    ...                 RectangularPrism(Pos(0, 0, 10), Pos(5, 5, 15)),
+    ...             )
+    ...         ),
+    ...         RectangularPrism(Pos(0, 10, 0), Pos(5, 15, 5)),
+    ...     ]
+    ... )
     False
 
-    >>> any_overlap([
-    ...     CompositeRegion((
+    >>> any_overlap(
+    ...     [
+    ...         CompositeRegion(
+    ...             (
+    ...                 RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
+    ...                 RectangularPrism(Pos(0, 0, 10), Pos(5, 5, 15)),
+    ...             )
+    ...         ),
     ...         RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
-    ...         RectangularPrism(Pos(0, 0, 10), Pos(5, 5, 15)),
-    ...     )),
-    ...     RectangularPrism(Pos(10, 0, 0), Pos(15, 5, 5)),
-    ...     RectangularPrism(Pos(5, 0, 0), Pos(10, 5, 5)),
-    ... ])
+    ...         RectangularPrism(Pos(5, 0, 0), Pos(10, 5, 5)),
+    ...     ]
+    ... )
     True
     """
     return any(
@@ -1072,8 +1061,7 @@ def partial_coord(values, axis_index):
 
 
 # TODO: Consider rewriting to simplify
-# pylint: disable-next=C901
-def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:
+def display_regions_orthographic(regions: list[Region], axis: Axis) -> None:  # noqa: C901
     """
     "Compactly" display a list of regions in ASCII using an axis-aligned
     orthographic projection, removing empty space.

@@ -27,7 +27,7 @@ class AbortSyntaxErrorListener(ErrorListener):
 
 
 def children_contexts(
-    ctx_func: Callable[[int], Optional[ParseTree]]
+    ctx_func: Callable[[int], Optional[ParseTree]],
 ) -> list[ParseTree]:
     """
     The list of elements provided by a zero-indexed (index: int -> Optional[ParseTree])
@@ -88,9 +88,11 @@ def vhdl_tree_from_str(
     node_type: str = "design_file",
 ) -> ParseTree:
     """
-    >>> print(bracket_printed_vhdl_parse_tree(
-    ...     vhdl_tree_from_str("unsigned(1 downto 0)", "subtype_indication")
-    ... ))
+    >>> print(
+    ...     bracket_printed_vhdl_parse_tree(
+    ...         vhdl_tree_from_str("unsigned(1 downto 0)", "subtype_indication")
+    ...     )
+    ... )
     ['unsigned', ['(', ['1', 'downto', '0'], ')']]
     """
     return vhdl_tree_from_stream(InputStream(source), node_type=node_type)

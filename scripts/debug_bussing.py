@@ -33,18 +33,22 @@ def main():
     )
 
     example_placements = {
-        "square-ish": frozendict({
-            'not_a': (Pos(24, 20, 22), 'north'),
-            'not_b': (Pos(25, 15, 15), 'north'),
-            'and': (Pos(24, 15, 23), 'north'),
-            'not_out': (Pos(25, 17, 16), 'north')
-        }),
-        "square": frozendict({
-            'not_a': (Pos(24, 20, 15), 'north'),
-            'not_b': (Pos(24, 15, 15), 'north'),
-            'and': (Pos(24, 15, 24), 'north'),
-            'not_out': (Pos(24, 17, 30), 'north')
-        }),
+        "square-ish": frozendict(
+            {
+                "not_a": (Pos(24, 20, 22), "north"),
+                "not_b": (Pos(25, 15, 15), "north"),
+                "and": (Pos(24, 15, 23), "north"),
+                "not_out": (Pos(25, 17, 16), "north"),
+            }
+        ),
+        "square": frozendict(
+            {
+                "not_a": (Pos(24, 20, 15), "north"),
+                "not_b": (Pos(24, 15, 15), "north"),
+                "and": (Pos(24, 15, 24), "north"),
+                "not_out": (Pos(24, 17, 30), "north"),
+            }
+        ),
     }
 
     placement_name = "square"
@@ -124,6 +128,7 @@ def main():
     )
 
     import pdb
+
     pdb.set_trace()
 
 

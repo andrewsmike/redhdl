@@ -21,18 +21,26 @@ class PositionalData(dict[Pos, BlockData]):
 
     def min_pos(self) -> Pos:
         """
-        >>> PositionalData({
-        ...     Pos(1, 1, 4): None, Pos(1, 0, 2): None, Pos(0, 3, 0): None,
-        ... }).min_pos()
+        >>> PositionalData(
+        ...     {
+        ...         Pos(1, 1, 4): None,
+        ...         Pos(1, 0, 2): None,
+        ...         Pos(0, 3, 0): None,
+        ...     }
+        ... ).min_pos()
         Pos(0, 0, 0)
         """
         return Pos.elem_min(*self.keys())
 
     def max_pos(self) -> Pos:
         """
-        >>> PositionalData({
-        ...     Pos(0, 0, 2): None, Pos(1, 1, 1): None, Pos(0, 3, 2): None,
-        ... }).max_pos()
+        >>> PositionalData(
+        ...     {
+        ...         Pos(0, 0, 2): None,
+        ...         Pos(1, 1, 1): None,
+        ...         Pos(0, 3, 2): None,
+        ...     }
+        ... ).max_pos()
         Pos(1, 3, 2)
         """
         return Pos.elem_max(*self.keys())

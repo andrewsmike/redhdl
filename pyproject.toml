@@ -121,7 +121,7 @@ ignore = [
 
 [tool.ruff.format]
 docstring-code-format = true
-docstring-code-line-length = 20
+docstring-code-line-length = 100
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true

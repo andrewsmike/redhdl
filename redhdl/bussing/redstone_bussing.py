@@ -41,12 +41,8 @@ Examples:
 ...     costs,
 ...     algo_steps,
 ... ) = redstone_bussing_details(
-...     start_pos=Pos(
-...         0, 0, 0
-...     ),
-...     end_pos=Pos(
-...         3, 2, 2
-...     ),
+...     start_pos=Pos(0, 0, 0),
+...     end_pos=Pos(3, 2, 2),
 ...     start_xz_dir="south",
 ...     end_xz_dir="east",
 ...     instance_points=set(),
@@ -70,9 +66,7 @@ RedstoneBussing(element_sig_strengths=frozendict.frozendict({Pos(0, 0, 0): 15, .
 >>> print(costs)
 [1, 1, 4, 1, 1]
 
->>> schem = (
-...     bussing.schem()
-... )
+>>> schem = bussing.schem()
 >>> pprint(schem)
 Schematic(pos_blocks={Pos(0, -1, 0): Block(block_type='minecraft:..._wool',
                                            attributes=frozendict.frozendict({})),
@@ -89,9 +83,7 @@ The minimal bus has a traverse element, and an ascend element:
 >>> from redhdl.voxel.region import (
 ...     display_regions,
 ... )
->>> display_regions(
-...     schem.pos_blocks.mask()
-... )  # doctest: +NORMALIZE_WHITESPACE
+>>> display_regions(schem.pos_blocks.mask())  # doctest: +NORMALIZE_WHITESPACE
 Y  [(0, 2)]
    1
   11
@@ -113,15 +105,17 @@ Y  [(0, 3)]
 >>> from math import floor
 >>> from time import time
 >>> from redhdl.voxel.schematic import save_schem
->>> for i, (start_pos, end_pos) in enumerate([  # doctest: +NORMALIZE_WHITESPACE
-...     (Pos(0, 0, 0), Pos(3, 2, 2)),
-...     (Pos(0, 0, 0), Pos(0, 4, 3)),
-...     (Pos(0, 0, 0), Pos(2, 6, 3)),
-...     (Pos(0, 0, 0), Pos(0, 8, 0)),
-...     (Pos(0, 0, 0), Pos(8, 0, 0)),
-...     (Pos(0, 0, 0), Pos(6, 0, 6)),
-...     (Pos(0, 0, 0), Pos(10, 8, 10)),
-... ]):
+>>> for i, (start_pos, end_pos) in enumerate(
+...     [  # doctest: +NORMALIZE_WHITESPACE
+...         (Pos(0, 0, 0), Pos(3, 2, 2)),
+...         (Pos(0, 0, 0), Pos(0, 4, 3)),
+...         (Pos(0, 0, 0), Pos(2, 6, 3)),
+...         (Pos(0, 0, 0), Pos(0, 8, 0)),
+...         (Pos(0, 0, 0), Pos(8, 0, 0)),
+...         (Pos(0, 0, 0), Pos(6, 0, 6)),
+...         (Pos(0, 0, 0), Pos(10, 8, 10)),
+...     ]
+... ):
 ...     bussing = redstone_bussing(
 ...         start_pos=start_pos,
 ...         end_pos=end_pos,

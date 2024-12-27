@@ -14,7 +14,7 @@ build:
 	docker-compose build test
 
 debug:
-	docker-compose run --build --rm -T test /bin/bash
+	docker-compose run --build --rm test /bin/bash
 
 test:
 	docker-compose run --build --rm -T test make test_local

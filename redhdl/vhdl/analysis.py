@@ -214,14 +214,17 @@ def port_clause_ports(parse_tree: ParseTree) -> dict[str, Port]:
     Binary port definition:
     - subtype_indication -> selected_name -> identifier -> "std_logic"
 
-    >>> port_clause_node = parsed('''
+    >>> port_clause_node = parsed(
+    ...     '''
     ...   port (
     ...     A : in std_logic;
     ...     B : in unsigned(1 downto 0);
     ...     C : out std_logic;
     ...     D : out unsigned(1 downto 0)
     ...   );
-    ... ''', "port_clause")
+    ... ''',
+    ...     "port_clause",
+    ... )
     >>> pprint(port_clause_ports(port_clause_node))
     {'A': Port(port_type='in', pin_count=1),
      'B': Port(port_type='in', pin_count=2),
@@ -281,7 +284,8 @@ def architecture_ports(
                     'C': Port(port_type='out', pin_count=1),
                     'D': Port(port_type='out', pin_count=2)}}
 
-    >>> entity_decl_node = parsed('''
+    >>> entity_decl_node = parsed(
+    ...     '''
     ... entity Simple_Row is
     ...   port (
     ...     A : in std_logic;
@@ -290,7 +294,9 @@ def architecture_ports(
     ...     D : out unsigned(1 downto 0)
     ...   );
     ... end entity;
-    ... ''', "entity_declaration")
+    ... ''',
+    ...     "entity_declaration",
+    ... )
     >>> pprint(architecture_ports_entity_declaration(entity_decl_node, []))
     {'Simple_Row': {'A': Port(port_type='in', pin_count=1),
                     'B': Port(port_type='in', pin_count=2),
@@ -644,16 +650,20 @@ def association_element_name_slice_expr(
     parse_tree: ParseTree,
 ) -> tuple[str, BitRange | None, Expression]:
     """
-    >>> association_element_name_slice_expr(parsed(
-    ...     "A (1 downto 0) => a + b / c",
-    ...     "association_element",
-    ... ))
+    >>> association_element_name_slice_expr(
+    ...     parsed(
+    ...         "A (1 downto 0) => a + b / c",
+    ...         "association_element",
+    ...     )
+    ... )
     ('A', (0, 1), SimpleExpr(...))
 
-    >>> association_element_name_slice_expr(parsed(
-    ...     "A => a + b / c",
-    ...     "association_element",
-    ... ))
+    >>> association_element_name_slice_expr(
+    ...     parsed(
+    ...         "A => a + b / c",
+    ...         "association_element",
+    ...     )
+    ... )
     ('A', None, SimpleExpr(...))
     """
     range_node = parse_tree_get(parse_tree, "formal_part", "explicit_range")
