@@ -38,89 +38,23 @@ False
 >>> just_beyond.intersects(continuing_with_overlap)
 True
 
->>> example.intersects(
-...     RectangularPrism(
-...         Pos(
-...             -2,
-...             -2,
-...             -2,
-...         ),
-...         Pos(
-...             -1,
-...             -1,
-...             -1,
-...         ),
-...     )
-... )
+>>> example.intersects(RectangularPrism(Pos(-2, -2, -2), Pos(-1, -1, -1)))
 False
->>> example.intersects(
-...     RectangularPrism(
-...         Pos(
-...             -1,
-...             -1,
-...             -1,
-...         ),
-...         Pos(8, 8, 8),
-...     )
-... )
+>>> example.intersects(RectangularPrism(Pos(-1, -1, -1), Pos(8, 8, 8)))
 True
 
 
 >>> composite_w_big_boi = CompositeRegion(
 ...     subregions=(
-...         RectangularPrism(
-...             Pos(
-...                 0,
-...                 0,
-...                 0,
-...             ),
-...             Pos(
-...                 2,
-...                 3,
-...                 4,
-...             ),
-...         ),
-...         RectangularPrism(
-...             Pos(
-...                 -1,
-...                 -1,
-...                 -1,
-...             ),
-...             Pos(
-...                 8,
-...                 8,
-...                 8,
-...             ),
-...         ),
+...         RectangularPrism(Pos(0, 0, 0), Pos(2, 3, 4)),
+...         RectangularPrism(Pos(-1, -1, -1), Pos(8, 8, 8)),
 ...     )
 ... )
 
 >>> composite_just_beyond = CompositeRegion(
 ...     subregions=(
-...         RectangularPrism(
-...             Pos(
-...                 3,
-...                 4,
-...                 5,
-...             ),
-...             Pos(
-...                 8,
-...                 8,
-...                 8,
-...             ),
-...         ),
-...         RectangularPrism(
-...             Pos(
-...                 -2,
-...                 -2,
-...                 -2,
-...             ),
-...             Pos(
-...                 -1,
-...                 -1,
-...                 -1,
-...             ),
-...         ),
+...         RectangularPrism(Pos(3, 4, 5), Pos(8, 8, 8)),
+...         RectangularPrism(Pos(-2, -2, -2), Pos(-1, -1, -1)),
 ...     )
 ... )
 
@@ -128,22 +62,7 @@ True
 CompositeRegion(subregions=(RectangularPrism(Pos(3, 4, 5), Pos(8, 8, 8)),
                             RectangularPrism(Pos(-1, -1, -1), Pos(-1, -1, -1))))
 
->>> composite_example = CompositeRegion(
-...     (
-...         RectangularPrism(
-...             Pos(
-...                 0,
-...                 0,
-...                 0,
-...             ),
-...             Pos(
-...                 2,
-...                 3,
-...                 4,
-...             ),
-...         ),
-...     )
-... )
+>>> composite_example = CompositeRegion((RectangularPrism(Pos(0, 0, 0), Pos(2, 3, 4)),))
 >>> composite_example.intersects(just_beyond)
 False
 >>> example.intersects(composite_just_beyond)
