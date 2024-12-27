@@ -110,7 +110,7 @@ ignore = [
     "E266",
     "E501",
     "F841",
-    "SIM118",  # Being explicit when iterating over dict .keys() honestly seems clearer to me
+    "SIM118",  # Being explicit when iterating over dict.keys() honestly seems clearer to me
 ]
 
 [tool.ruff.format]
