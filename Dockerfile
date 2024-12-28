@@ -3,6 +3,9 @@ FROM python:3.10-bookworm AS redhdl
 ENV REDHDL /pkg/redhdl
 WORKDIR $REDHDL/
 
+RUN apt-get update
+RUN apt-get install iverilog
+
 COPY setup.py $REDHDL/setup.py
 COPY pyproject.toml $REDHDL/pyproject.toml
 

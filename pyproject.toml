@@ -34,7 +34,16 @@ test = [
 
 
 [project.scripts]
+# Top level commands: Compile and visualize schematics
+sv_to_schem = "scripts.sv_to_schem:main"
+display_schem = "scripts.display_schem:main"
+
+# Visualize vHDL ASTs for development.
 display_vhdl = "redhdl.parser.vhdl:display_example_program"
+
+# Visualize busses and debug bussing logic.
+visualize_bussing = "scripts.visualize_bussing:main"
+debug_bussing = "scripts.debug_bussing:main"
 
 
 [tool.black]

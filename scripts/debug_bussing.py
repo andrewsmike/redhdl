@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from functools import reduce
 import operator
 
@@ -28,7 +29,7 @@ from redhdl.voxel.schematic import save_schem
 def main():
     netlist = netlist_from_simple_spec(
         instance_config=example_instance_configs,
-        example_port_slice_assignments=example_port_slice_assignments,
+        port_slice_assignments=example_port_slice_assignments,
         output_port_bitwidths={"out": 8},
     )
 

@@ -309,7 +309,7 @@ def schematic_placement_from_netlist(
     TOTAL_ROUNDS = 150
 
     def checkpoint(round: int, placement: InstancePlacement, cost: float):
-        path = f"checkpoints/output_{round}.schem"
+        path = f"build/checkpoints/output_{round}.schem"
         try:
             schem = solution_schematic(placement)
             save_schem(schem, path)
